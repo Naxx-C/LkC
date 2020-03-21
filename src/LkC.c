@@ -1,5 +1,6 @@
-#include<stdio.h>
-#include "arcfault_algo.h"
+#include <arcfault_algo.h>
+#include <stdio.h>
+
 float current[128] = { -40.283203, -41.796875, -42.67578, -42.382812, -42.333984, -42.871094, -43.359375,
         -43.45703, -43.45703, -43.359375, -43.45703, -43.01758, -41.992188, -40.478516, -38.03711, -36.42578,
         -35.44922, -34.32617, -33.251953, -32.421875, -30.46875, -29.492188, -28.076172, -26.513672,
@@ -32,12 +33,22 @@ float current2[128] = { 0.09765625, 0.0, 0.048828125, 0.048828125, -0.24414062, 
         0.048828125, 0.09765625, 0.14648438, 0.24414062, 0.390625, 0.24414062, 0.14648438, 0.29296875,
         0.29296875, 0.34179688, 0.43945312, 0.34179688, 0.43945312, 0.390625, 0.48828125, 0.48828125,
         0.5371094, 0.6347656, 0.6347656 };
-
+int max(int a,int b);
+void f(int* a){
+    *a=3;
+}
 int main(){
     int length = 128;
     int outArcNum = 1;
     setArcFftEnabled(0);
-    arcAnalyze(current, length, &outArcNum);
-    printf("outArcNum=%d\n",outArcNum);
+    init(1);
+    arcAnalyze(0,current, length, &outArcNum);
+    printf("outArcNum=%d\n", outArcNum);
+    printf("%d %d\n", max(3, 2), getArcAlgoVersion());
+    printf("%s %d %s %s", __FILE__, __LINE__, __DATE__, __TIME__);
+
+//    int a=4;
+//    f(&a);
+//    printf("%d\n", a);
     return 0;
 }
