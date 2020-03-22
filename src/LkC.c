@@ -33,10 +33,7 @@ float current2[128] = { 0.09765625, 0.0, 0.048828125, 0.048828125, -0.24414062, 
         0.048828125, 0.09765625, 0.14648438, 0.24414062, 0.390625, 0.24414062, 0.14648438, 0.29296875,
         0.29296875, 0.34179688, 0.43945312, 0.34179688, 0.43945312, 0.390625, 0.48828125, 0.48828125,
         0.5371094, 0.6347656, 0.6347656 };
-int max(int a,int b);
-void f(int* a){
-    *a=3;
-}
+
 int main(){
     int length = 128;
     int outArcNum = 1;
@@ -44,7 +41,7 @@ int main(){
     init(1);
     arcAnalyze(0,current, length, &outArcNum);
     printf("outArcNum=%d\n", outArcNum);
-    printf("%d %d\n", max(3, 2), getArcAlgoVersion());
+    printf("version=%d\n", getArcAlgoVersion());
     printf("%s %d %s %s", __FILE__, __LINE__, __DATE__, __TIME__);
 
 //    int a=4;

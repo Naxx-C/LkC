@@ -117,13 +117,13 @@ void init(int channelNum) {
     memset(mLastPeriodPiont, 0, sizeof(float) * gChannelNum);
 
     gIsFirst = (char*) malloc(sizeof(char) * gChannelNum);
-    memset(gIsFirst, 0, sizeof(char) * gChannelNum);
+    memset(gIsFirst, 1, sizeof(char) * gChannelNum);
     // 稳态判断
     gIsStable = (char*) malloc(sizeof(char) * gChannelNum);
-    memset(gIsStable, 0, sizeof(char) * gChannelNum);
+    memset(gIsStable, 1, sizeof(char) * gChannelNum);
 
     gIsHarmonicStable = (char*) malloc(sizeof(char) * gChannelNum);
-    memset(gIsHarmonicStable, 0, sizeof(char) * gChannelNum);
+    memset(gIsHarmonicStable, 1, sizeof(char) * gChannelNum);
 }
 
 char arcAnalyze(int channel, float *current, int length, int *outArcNum) {
