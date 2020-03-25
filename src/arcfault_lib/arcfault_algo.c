@@ -43,7 +43,7 @@ const char LOG_ON = 1;
 static int *gStatus = NULL;
 static int *gArcNumAlarming = NULL; // 报警发生时的电弧数目
 #define CYCLE_NUM_1S 50
-static char**gArcBuff = NULL;
+static char **gArcBuff = NULL;
 static int *gArcBuffIndex = NULL; // point to next write point
 static char **gEasyArcBuff = NULL;
 
@@ -59,7 +59,7 @@ static char *gIsStable = NULL;
 static char *gIsHarmonicStable = NULL;
 
 //只可以配置一次
-void init(int channelNum) {
+void arcALgoInit(int channelNum) {
     if (gTimer != NULL)
         return;
     gChannelNum = channelNum;
@@ -84,28 +84,28 @@ void init(int channelNum) {
     memset(gArcNumAlarming, 0, sizeof(int) * gChannelNum);
 
     gArcBuff = (char**) malloc(sizeof(char*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++){
+    for (int i = 0; i < gChannelNum; i++) {
         gArcBuff[i] = (char*) malloc(sizeof(char) * CYCLE_NUM_1S);
-        memset(gArcBuff[i],0, sizeof(char) * CYCLE_NUM_1S);
+        memset(gArcBuff[i], 0, sizeof(char) * CYCLE_NUM_1S);
     }
 
     gArcBuffIndex = (int*) malloc(sizeof(int) * gChannelNum);
     memset(gArcBuffIndex, 0, sizeof(int) * gChannelNum);
 
     gEasyArcBuff = (char**) malloc(sizeof(char*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++){
+    for (int i = 0; i < gChannelNum; i++) {
         gEasyArcBuff[i] = (char*) malloc(sizeof(char) * CYCLE_NUM_1S);
         memset(gEasyArcBuff[i], 0, sizeof(char) * CYCLE_NUM_1S);
     }
 
     gEffBuff = (float**) malloc(sizeof(float*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++){
+    for (int i = 0; i < gChannelNum; i++) {
         gEffBuff[i] = (float*) malloc(sizeof(float) * MOREINFO_BUFF_NUM);
         memset(gEffBuff[i], 0, sizeof(float) * MOREINFO_BUFF_NUM);
     }
 
     gHarmonicBuff = (float**) malloc(sizeof(float*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++){
+    for (int i = 0; i < gChannelNum; i++) {
         gHarmonicBuff[i] = (float*) malloc(sizeof(float) * MOREINFO_BUFF_NUM);
         memset(gHarmonicBuff[i], 0, sizeof(float) * MOREINFO_BUFF_NUM);
     }
@@ -126,9 +126,9 @@ void init(int channelNum) {
     memset(gIsHarmonicStable, 1, sizeof(char) * gChannelNum);
 }
 
-char arcAnalyze(int channel, float *current, int length, int *outArcNum) {
+char arcAnalyze(int channel, float *current, int length, int *outArcNum, int *thisPeriodNum) {
     float effCurrent = arcuEffectiveValue(current, length);
-    return arcAnalyzeInner(channel, current, length, effCurrent, NULL, outArcNum);
+    return arcAnalyzeInner(channel, current, length, effCurrent, NULL, outArcNum, thisPeriodNum);
 }
 
 /**
@@ -145,7 +145,7 @@ char arcAnalyze(int channel, float *current, int length, int *outArcNum) {
  * @return 是否需要故障报警,0不需要,1需要,-1未初始化
  */
 char arcAnalyzeInner(int channel, float *current, const int length, float effCurrent, float *oddFft,
-        int *outArcNum) {
+        int *outArcNum, int *thisPeriodNum) {
     if (gTimer == NULL || channel >= gChannelNum) {
         return -1;
     }
@@ -385,8 +385,12 @@ char arcAnalyzeInner(int channel, float *current, const int length, float effCur
         if (end >= start) {
             dutyRatio = (dutyCounter * 100) / totalLen;
         }
+        // 记录当前1s内的总电弧数
         if (outArcNum != NULL)
             *outArcNum = num;
+        // 记录当前周期128个点的电弧数
+        if (thisPeriodNum != NULL)
+            *thisPeriodNum = resArcNum + inductArcNum;
 
         // 检测到电弧14个->进入待确认状态->在待确认期间发现不符合条件直接进入免疫->切出稳态后再继续进入正常检测期
         switch (gStatus[channel]) {
@@ -408,10 +412,11 @@ char arcAnalyzeInner(int channel, float *current, const int length, float effCur
             if (gTimer[channel] - gWatingTime[channel] > gDelayCheckTime && effValue > 1.5f) {
                 gStatus[channel] = STATUS_NORMAL;
                 pAlarmCounter[channel]++;
-                *outArcNum = gArcNumAlarming[channel]; // 报警时使用确认点时记录的数目
+                if (outArcNum != NULL)
+                    *outArcNum = gArcNumAlarming[channel]; // 报警时使用确认点时记录的数目
                 return 1;
             } else if (dutyRatio >= gDutyRatioThresh || have2Number * 100 / totalLen >= gArc2NumRatioThresh
-                    || maxSeries >= gMaxSeriesThresh || (gFftEnabled && gIsHarmonicStable[channel])) {
+                    || maxSeries >= gMaxSeriesThresh) {
                 gStatus[channel] = STATUS_IMMUNE;
                 break;
             }

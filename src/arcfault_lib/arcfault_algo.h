@@ -1,6 +1,6 @@
 #ifndef __ARCFAULT_ALGO
 #define __ARCFAULT_ALGO
-char arcAnalyze(int channel, float *current, int length, int *outArcNum);
+char arcAnalyze(int channel, float *current, int length, int *outArcNum, int *thisPeriodNum);
 /**
  * @param current
  *            一个采样周期的电流数据。
@@ -15,7 +15,7 @@ char arcAnalyze(int channel, float *current, int length, int *outArcNum);
  * @return 是否需要故障报警,0不需要,1需要,-1未初始化
  */
 char arcAnalyzeInner(int channel, float *current, const int length, float effCurrent, float *oddFft,
-        int *outArcNum);
+        int *outArcNum, int *thisPeriodNum);
 void setArcMinExtremeDis(int minExtremeDis);
 void setArcMinWidth(int minWidth);
 void setArcCallPeriod(int callPeriod);
@@ -33,7 +33,7 @@ void setArcInductMaxJumpRatio(float inductMaxJumpRatio);
 void setArcInductJumpMinThresh(float inductJumpMinThresh);
 void setArcFftEnabled(char fftEnabled);
 //初始化，通道数
-void init(int channelNum);
+void arcALgoInit(int channelNum);
 /**
  * @return 返回4个字节版本号，第1个字节为完全重构；第2个字节为功能修改；第3、4个字节为bug修复等小改动
  */
