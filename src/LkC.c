@@ -93,14 +93,14 @@ int main() {
                     int arcNum1s[CHANNEL];
                     memset(outArcNum, 0, sizeof(int) * CHANNEL);
                     for (int channel = 0; channel < CHANNEL; channel++) {
-                        char alarm = arcAnalyze(channel, current, 128, &(arcNum1s[channel]), &(outArcNum[channel]));
+                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]), &(outArcNum[channel]));
                         alarmNum[channel] += alarm;
                         totalArc[channel] += outArcNum[channel];
                         //TODO:debug remove
                         //if (alarm > 0)
                         if (outArcNum[channel] > 0){
                             printf("file=%s index=%d num=%d\n", entry->d_name, fileIndex - 128,outArcNum[channel]);
-                            printf("arcNum1s=%d\n", arcNum1s[channel]);
+//                            printf("arcNum1s=%d\n", arcNum1s[channel]);
                         }
                     }
                     i = 0;

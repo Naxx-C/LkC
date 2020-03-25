@@ -241,8 +241,7 @@ char arcAnalyzeInner(int channel, float *current, const int length, float effCur
                                 averageDelta);
 
                         if ((extIndex >= faultIndex + gMinExtremeDis)
-                                || (extIndex < faultIndex
-                                        && extIndex >= (faultIndex + gMinExtremeDis) % length)) {
+                                || (extIndex < faultIndex && extIndex + length >= faultIndex + gMinExtremeDis)) {
                             // pass
                         } else {
                             // 距离极值点不足1/8周期，很可能是吸尘器开关电源等短尖周期的波形
