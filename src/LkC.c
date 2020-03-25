@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "dirent.h"
 #include <string.h>
+#include <time.h>
 
 float current[128] = { -3.41796875, -3.41796875, -3.41796875, -3.46679688, -3.41796875, -3.41796875,
         -3.36914063, -3.515625, -3.27148438, -3.07617188, -2.83203125, -2.58789063, -2.39257813, -2.34375,
@@ -53,8 +54,9 @@ char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_878kw_jo
 //    char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner\\";
 //    char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner_Resistor\\";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_1.69kw_joint_to_apart";
+const char *APP_BUILD_DATE = __DATE__;
+
 int main() {
-    printf("version=%d\n", getArcAlgoVersion());
     DIR *dir = NULL;
     const int CHANNEL = 1;
     struct dirent *entry;
@@ -62,7 +64,7 @@ int main() {
     int totalArc[CHANNEL], alarmNum[CHANNEL];
     memset(totalArc, 0, sizeof(int) * CHANNEL);
     memset(alarmNum, 0, sizeof(int) * CHANNEL);
-    int pointNum = 0,fileIndex=0;
+    int pointNum = 0, fileIndex = 0;
     if ((dir = opendir(dirPath)) == NULL) {
         printf("opendir failed\n");
     } else {
@@ -71,7 +73,7 @@ int main() {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0
                     || !endWith(entry->d_name, ".csv")) ///current dir OR parrent dir
                 continue;
-            fileIndex=0;
+            fileIndex = 0;
             memset(csv, 0, sizeof(csv));
             snprintf(csv, sizeof(csv) - 1, "%s\\%s", dirPath, entry->d_name);
 //            printf("filepath=%s filetype=%d\n", csv, entry->d_type);        //输出文件或者目录的名称
@@ -82,7 +84,11 @@ int main() {
             int i = 0;
 
             setArcFftEnabled(0);
-            arcALgoInit(CHANNEL);
+            char ret = arcAlgoInit(CHANNEL);
+            if (ret > 1) {
+                printf("some error\n");
+                return -1;
+            }
             while (!feof(f) && !ferror(f)) {
                 float cur, vol;
                 fscanf(f, "%f,%f", &cur, &vol);
@@ -93,14 +99,16 @@ int main() {
                     int arcNum1s[CHANNEL];
                     memset(outArcNum, 0, sizeof(int) * CHANNEL);
                     for (int channel = 0; channel < CHANNEL; channel++) {
-                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]), &(outArcNum[channel]));
+                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
+                                &(outArcNum[channel]));
                         alarmNum[channel] += alarm;
                         totalArc[channel] += outArcNum[channel];
                         //TODO:debug remove
                         //if (alarm > 0)
-                        if (outArcNum[channel] > 0){
-                            printf("file=%s index=%d num=%d\n", entry->d_name, fileIndex - 128,outArcNum[channel]);
-//                            printf("arcNum1s=%d\n", arcNum1s[channel]);
+                        if (outArcNum[channel] > 0) {
+                            printf("file=%s index=%d num=%d\n", entry->d_name, fileIndex - 128,
+                                    outArcNum[channel]);
+                            // printf("arcNum1s=%d\n", arcNum1s[channel]);
                         }
                     }
                     i = 0;

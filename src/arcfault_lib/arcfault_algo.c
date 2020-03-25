@@ -2,6 +2,7 @@
 #include "arcfault_utils.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 //#define Malloc(type,n)  (type *)malloc((n)*sizeof(type))
 /**
@@ -58,10 +59,49 @@ static char *gIsFirst = NULL;
 static char *gIsStable = NULL;
 static char *gIsHarmonicStable = NULL;
 
-//只可以配置一次
-void arcALgoInit(int channelNum) {
+extern char *APP_BUILD_DATE;
+char gIsLibExpired = 1;
+const char *EXPIRED_DATE = "2020-12-30";
+// prebuiltDate sample "Mar 03 2020"
+int isExpired(const char *prebuiltDate, const char *expiredDate) {
+    if (prebuiltDate == NULL || expiredDate == NULL)
+        return 1;
+
+    const static char MONTH_NAME[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+            "Oct", "Nov", "Dec" };
+    char monthString[4] = { 0 };
+    int prebuiltYear = 2020, prebuiltMonth = 4, prebuiltDay = 1;
+    int expiredYear = 2020, expiredMonth = 1, expiredDay = 1;
+    sscanf(prebuiltDate, "%s %d %d", monthString, &prebuiltDay, &prebuiltYear);
+
+    for (int i = 0; i < 12; i++) {
+        if (strncasecmp(monthString, MONTH_NAME[i], 3) == 0) {
+            prebuiltMonth = i + 1;
+            break;
+        }
+    }
+
+    sscanf(expiredDate, "%d-%d-%d", &expiredYear, &expiredMonth, &expiredDay);
+    int score = (expiredYear - prebuiltYear) * 31 * 12 + (expiredMonth - prebuiltMonth) * 31
+            + (expiredDay - prebuiltDay);
+    //得分小于0为过期
+    return score < 0;
+}
+
+int arcAlgoStatus() {
+    return gIsLibExpired;
+}
+
+//初始化
+int arcAlgoInit(int channelNum) {
+    //已经初始化过
     if (gTimer != NULL)
-        return;
+        return 1;
+    //通道数不可以大于8
+    if (channelNum >= 8)
+        return -2;
+    gIsLibExpired = isExpired(APP_BUILD_DATE, EXPIRED_DATE);
+
     gChannelNum = channelNum;
     pBigJumpCounter = (int*) malloc(sizeof(int) * gChannelNum); // 大跳跃的计数器
     memset(pBigJumpCounter, 0, sizeof(int) * gChannelNum);
@@ -124,9 +164,15 @@ void arcALgoInit(int channelNum) {
 
     gIsHarmonicStable = (char*) malloc(sizeof(char) * gChannelNum);
     memset(gIsHarmonicStable, 1, sizeof(char) * gChannelNum);
+
+    //内存分配失败
+    if (gIsHarmonicStable == NULL)
+        return -1;
+
+    return 0;
 }
 
-char arcAnalyze(int channel, float *current, int length, int *outArcNum, int *thisPeriodNum) {
+int arcAnalyze(int channel, float *current, int length, int *outArcNum, int *thisPeriodNum) {
     float effCurrent = arcuEffectiveValue(current, length);
     return arcAnalyzeInner(channel, current, length, effCurrent, NULL, outArcNum, thisPeriodNum);
 }
@@ -144,7 +190,7 @@ char arcAnalyze(int channel, float *current, int length, int *outArcNum, int *th
  *            output检测到的电弧数目(不一定是故障电弧，好弧也包含在内),可设置为NULL
  * @return 是否需要故障报警,0不需要,1需要,-1未初始化
  */
-char arcAnalyzeInner(int channel, float *current, const int length, float effCurrent, float *oddFft,
+int arcAnalyzeInner(int channel, float *current, const int length, float effCurrent, float *oddFft,
         int *outArcNum, int *thisPeriodNum) {
     if (gTimer == NULL || channel >= gChannelNum) {
         return -1;
@@ -152,6 +198,14 @@ char arcAnalyzeInner(int channel, float *current, const int length, float effCur
 
     // global timer
     gTimer[channel]++;
+    // to protect lib, add random alarm for every 2.6days and 4.1days
+    if (gIsLibExpired && (gTimer[channel] % 11232000 == 11231999 || gTimer[channel] % 17712000 == 17711999)) {
+        if (outArcNum != NULL)
+            *outArcNum = 14;
+        if (thisPeriodNum != NULL)
+            *thisPeriodNum = 1;
+        return 1;
+    }
 
     int resArcNum = 0, easyArcNum = 0, inductArcNum = 0;
     float d1[length]; // 一重微分
@@ -334,6 +388,11 @@ char arcAnalyzeInner(int channel, float *current, const int length, float effCur
     } else {
     }
 
+    // to protect lib, remove induct arc detection
+    if (gIsLibExpired) {
+        inductArcNum /= 2;
+    }
+
     // 一些重要状态变量赋值
     gEffBuff[channel][gMoreInfoIndex[channel]] = effValue;
     if (gFftEnabled && oddFft != NULL) {
@@ -408,6 +467,10 @@ char arcAnalyzeInner(int channel, float *current, const int length, float effCur
             }
             break;
         case STATUS_WAITING_CHECK:
+            // to protect lib, remove fault alarm check
+            if (gIsLibExpired) {
+                return 1;
+            }
             if (gTimer[channel] - gWatingTime[channel] > gDelayCheckTime && effValue > 1.5f) {
                 gStatus[channel] = STATUS_NORMAL;
                 pAlarmCounter[channel]++;
