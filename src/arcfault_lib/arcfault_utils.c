@@ -1,9 +1,9 @@
 #include "arcfault_utils.h"
 #include <stdio.h>
-#ifdef _WINDOWS
-#include <math.h>
-#else
+#ifdef ARM_MATH_CM4
 #include "arm_math.h"
+#else
+#include <math.h>
 #endif
 
 // 极值点在查找范围内，则认为是吸尘器等造成的电弧误报
@@ -19,15 +19,15 @@ float arcuMean(float *inputs, int len) {
 
 float arcuEffectiveValue(float* inputs, int len) {
 
-#ifdef _WINDOWS
-    float sumOfSquares = 0;
-    for (int i = 0; i < len; i++)
-        sumOfSquares += inputs[i] * inputs[i];
-    return (float)sqrt(sumOfSquares / len);
-#else
+#ifdef ARM_MATH_CM4
     float eff = 0;
     arm_rms_f32(inputs, len, &eff);
     return eff;
+#else
+    float sumOfSquares = 0;
+    for (int i = 0; i < len; i++)
+        sumOfSquares += inputs[i] * inputs[i];
+    return (float) sqrt(sumOfSquares / len);
 #endif
 }
 
@@ -269,11 +269,11 @@ float arcuAbs(float val) {
 }
 
 float arcuSqrt(float val) {
-#ifdef _WINDOWS
-    return (float)sqrt(val);
-#else
+#ifdef ARM_MATH_CM4
     float sqrt = 0;
-    arm_sqrt_f32(p, &sqrt);
+    arm_sqrt_f32(val, &sqrt);
     return sqrt;
+#else
+    return (float)sqrt(val);
 #endif
 }

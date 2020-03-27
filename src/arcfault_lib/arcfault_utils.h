@@ -1,8 +1,6 @@
 #ifndef __SHORTCIRCUIT_ALGO
 #define __SHORTCIRCUIT_ALGO
 
-#define _WINDOWS
-
 float arcuMean(float *inputs, int len);
 float arcuEffectiveValue(float* inputs, int len);
 float arcuThreshAverage(float* inputs, int len, float thresh);

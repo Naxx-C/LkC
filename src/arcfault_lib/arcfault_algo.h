@@ -25,7 +25,6 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         int *outArcNum, int *thisPeriodNum);
 void setArcMinExtremeDis(int minExtremeDis);
 void setArcMinWidth(int minWidth);
-void setArcCallPeriod(int callPeriod);
 void setArcDelayCheckTime(int delayCheckTime);
 void setArcResJumpRatio(float resJumpRatio);
 void setArcAlarmThresh(int alarmThresh);

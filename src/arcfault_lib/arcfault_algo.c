@@ -11,7 +11,6 @@
 static const char VERSION[] = { 1, 0, 0, 0 };
 static int gMinExtremeDis = 19; // 阻性电弧发生点到极值的最小距离
 static int gMinWidth = 35; // 阻性电弧发生点最少宽度
-static int gCallPeriod = 20; // 调用间隔周期
 static int gDelayCheckTime = 1000 / 20; // 延迟报警时间
 static float gResJumpRatio = 4.0f; // 阻性负载最少跳变threshDelta的倍数
 static int gAlarmThresh = 14; // 故障电弧报警阈值，大于10，默认14
@@ -242,10 +241,10 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
     float effValue = effCurrent >= 0 ? effCurrent : arcuEffectiveValue(current, length);
 
     float health = arcuGetHealth(d1, d1abs, length, averageDelta / 3);
-    if (maxD1abs > threshDelta * gInductJumpRatio && maxD1abs > 0.9) {
+    if (maxD1abs > threshDelta * gInductJumpRatio && maxD1abs > 0.9f) {
         pBigJumpCounter++;
     }
-    if (health >= 76 && effValue >= 1.5) {
+    if (health >= 76.0f && effValue >= 1.5f) {
         // 最后3个点的电弧信息缺少，容易误判，忽略
         const int PARTIAL_MAX_INDEX = 3;
         for (int i = 1; i < length - PARTIAL_MAX_INDEX; i++) {
@@ -261,8 +260,8 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
 
                     // 正击穿时要求故障电弧点电压为正,取0.1为近似值
                     if (checkFailed == 0 || easyCheckFailed == 0) {
-                        if ((d1[i] > 0 && (current[i - 1] < -0.1 || current[i] < 0.1))
-                                || (d1[i] < 0 && (current[i - 1] > 0.1 || current[i] > -0.1))) {
+                        if ((d1[i] > 0 && (current[i - 1] < -0.1f || current[i] < 0.1f))
+                                || (d1[i] < 0 && (current[i - 1] > 0.1f || current[i] > -0.1f))) {
                             checkFailed = 1;
                             easyCheckFailed = 1;
                         }
@@ -500,10 +499,6 @@ void setArcMinExtremeDis(int minExtremeDis) {
 
 void setArcMinWidth(int minWidth) {
     gMinWidth = minWidth;
-}
-
-void setArcCallPeriod(int callPeriod) {
-    gCallPeriod = callPeriod;
 }
 
 void setArcDelayCheckTime(int delayCheckTime) {

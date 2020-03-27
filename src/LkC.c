@@ -98,7 +98,9 @@ int main() {
                     int outArcNum[CHANNEL];
                     int arcNum1s[CHANNEL];
                     memset(outArcNum, 0, sizeof(int) * CHANNEL);
-                    for (int channel = 0; channel < CHANNEL; channel++) {
+//                    for (int channel = 0; channel < CHANNEL; channel++)
+                    int n=0;while(1){int channel=0;
+                            printf("%d\n",n++);
                         char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
                                 &(outArcNum[channel]));
                         alarmNum[channel] += alarm;
