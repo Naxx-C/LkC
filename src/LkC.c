@@ -50,7 +50,8 @@ int parse(char *csvPath, int offset, float *currents, int len) {
 //char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\res_1.73kw_join_to_apart";
 //    char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\res_918w_join_to_apart\\";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_1.69kw_joint_to_apart";
-char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_878kw_joint_to_apart";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_878kw_joint_to_apart";
+char *dirPath = "F:\\data\\ArcfaultData\\20200331_Cleaner\\xichenqi_resistor_arc";
 //    char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner\\";
 //    char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner_Resistor\\";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_1.69kw_joint_to_apart";
@@ -84,6 +85,9 @@ int main() {
             int i = 0;
 
             setArcFftEnabled(0);
+            setArcCheckDisabled(8);
+            setArcMinWidth(30);
+
             char ret = arcAlgoInit(CHANNEL);
             if (ret > 1) {
                 printf("some error\n");
@@ -98,9 +102,9 @@ int main() {
                     int outArcNum[CHANNEL];
                     int arcNum1s[CHANNEL];
                     memset(outArcNum, 0, sizeof(int) * CHANNEL);
-//                    for (int channel = 0; channel < CHANNEL; channel++)
-                    int n=0;while(1){int channel=0;
-                            printf("%d\n",n++);
+                    for (int channel = 0; channel < CHANNEL; channel++) {
+//                    int n=0;while(1){int channel=0;
+//                            printf("%d\n",n++);
                         char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
                                 &(outArcNum[channel]));
                         alarmNum[channel] += alarm;

@@ -12,7 +12,7 @@ static const char VERSION[] = { 1, 0, 0, 0 };
 static int gMinExtremeDis = 19; // 阻性电弧发生点到极值的最小距离
 static int gMinWidth = 35; // 阻性电弧发生点最少宽度
 static int gDelayCheckTime = 1000 / 20; // 延迟报警时间
-static float gResJumpRatio = 4.0f; // 阻性负载最少跳变threshDelta的倍数
+static float gResJumpRatio = 3.5f; // 阻性负载最少跳变threshDelta的倍数
 static int gAlarmThresh = 14; // 故障电弧报警阈值，大于10，默认14
 static int gDutyRatioThresh = 92;
 static int gArc2NumRatioThresh = 40;
@@ -24,6 +24,8 @@ static float gInductJumpThresh = 2.5; // 阻性负载最小跳跃幅度，单位
 static float gInductMaxJumpRatio = 0.462; // 感性负载跳变值至少满足电流峰值的百分比，取50%低一点的值
 static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至少满足最大跳变值得百分比
 static char gFftEnabled = 0;
+#define CHECK_ITEM_NUM  9
+static char gCheckEnabled[CHECK_ITEM_NUM];
 
 /**
  * 自用区
@@ -164,6 +166,8 @@ int arcAlgoInit(int channelNum) {
     gIsHarmonicStable = (char*) malloc(sizeof(char) * gChannelNum);
     memset(gIsHarmonicStable, 1, sizeof(char) * gChannelNum);
 
+    memset(gCheckEnabled, 1, sizeof(char) * CHECK_ITEM_NUM);
+
     //内存分配失败
     if (gIsHarmonicStable == NULL)
         return -1;
@@ -237,7 +241,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
             minPoint = current[i];
     }
     float averageDelta = arcuMean(d1abs, length);
-    float threshDelta = arcuThreshAverage(d1abs, length, averageDelta); // 除去平肩部分
+    float threshDelta = arcuThreshAverage(d1abs, length, averageDelta / 2); // 除去平肩部分
     float effValue = effCurrent >= 0 ? effCurrent : arcuEffectiveValue(current, length);
 
     float health = arcuGetHealth(d1, d1abs, length, averageDelta / 3);
@@ -248,99 +252,102 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         // 最后3个点的电弧信息缺少，容易误判，忽略
         const int PARTIAL_MAX_INDEX = 3;
         for (int i = 1; i < length - PARTIAL_MAX_INDEX; i++) {
-            if (d1abs[i] > gResJumpRatio * threshDelta)
-                if (d1abs[i - 1] < threshDelta) { // 击穿前基本为平肩，不用跳跃过大
+            if (d1abs[i] > gResJumpRatio * threshDelta && d1abs[i] >= gResJumpThresh) {
 
-                    if (d1abs[i] < gResJumpThresh) {
-                        i += ONE_EIGHT_PERIOD;
-                        continue;
+                int pointFileIndex = i;
+                int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
+                int faultIndex = i;
+
+                // 击穿前基本为平肩，不用跳跃过大
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[1]) {
+                    if (d1abs[i - 1] >= threshDelta) {
+                        checkFailed = 1;
+                        easyCheckFailed = 1;
                     }
-                    int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
-                    int faultIndex = i;
-
-                    // 正击穿时要求故障电弧点电压为正,取0.1为近似值
-                    if (checkFailed == 0 || easyCheckFailed == 0) {
-                        if ((d1[i] > 0 && (current[i - 1] < -0.1f || current[i] < 0.1f))
-                                || (d1[i] < 0 && (current[i - 1] > 0.1f || current[i] > -0.1f))) {
-                            checkFailed = 1;
-                            easyCheckFailed = 1;
-                        }
-                    }
-
-                    // 順延方向一致性检测
-                    if (checkFailed == 0 || easyCheckFailed == 0) {
-
-                        // 顺序方向
-                        if (arcuIsConsistent(current, 128, d1[i], 0, i, 4) == 0) {
-                            checkFailed = 2;
-                            easyCheckFailed = 2;
-                        }
-                    }
-
-                    // 如果有前向，前向也需要一致
-                    if (checkFailed == 0 || easyCheckFailed == 0) {
-                        if (d1abs[i - 1] > averageDelta && d1[i - 1] * d1[i] < 0) {
-                            checkFailed = 3;
-                            easyCheckFailed = 3;
-                        }
-                    }
-
-                    // 极值点检查
-                    // i是故障电弧发生点
-                    int extIndex = faultIndex;
-                    if (checkFailed == 0) {
-
-                        extIndex = arcuExtremeInRange(current, length, faultIndex, gMinExtremeDis,
-                                averageDelta);
-
-                        if ((extIndex >= faultIndex + gMinExtremeDis)
-                                || (extIndex < faultIndex && extIndex + length >= faultIndex + gMinExtremeDis)) {
-                            // pass
-                        } else {
-                            // 距离极值点不足1/8周期，很可能是吸尘器开关电源等短尖周期的波形
-                            checkFailed = 4;
-                        }
-                    }
-
-                    // 宽度检查
-                    // 有可能极值点通过，但波形从极值点迅速下降
-                    if (checkFailed == 0) {
-
-                        int width = arcuGetWidth(current, length, faultIndex);
-                        if (width >= gMinWidth) {
-                            // pass
-                        } else {
-                            checkFailed = 5;
-                        }
-                    }
-
-                    // 大跳跃数限制
-                    if (checkFailed == 0) {
-                        int biggerNum = arcuGetBigNum(d1abs, length, d1abs[i], 0.8f);
-                        if (biggerNum >= 3) {
-                            checkFailed = 6;
-                        }
-                    }
-
-                    // 离散跳跃check，此后的跳跃*Ratio不可以比当前跳跃还大
-                    if (checkFailed == 0 || easyCheckFailed == 0) {
-                        for (int j = i + 1; j < i + PARTIAL_MAX_INDEX && j < length; j++) {
-                            if (d1abs[j] * gResFollowJumpMaxRatio >= d1abs[i]) {
-                                checkFailed = 7;
-                                easyCheckFailed = 7;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (checkFailed == 0) {
-                        resArcNum++;
-                    }
-                    if (easyCheckFailed == 0) {
-                        easyArcNum++;
-                    }
-                    i += ONE_EIGHT_PERIOD;
                 }
+
+                // 正击穿时要求故障电弧点电压为正,取0.1为近似值
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[2]) {
+                    if ((d1[i] > 0 && (current[i - 1] < -0.1f || current[i] < 0.1f))
+                            || (d1[i] < 0 && (current[i - 1] > 0.1f || current[i] > -0.1f))) {
+                        checkFailed = 2;
+                        easyCheckFailed = 2;
+                    }
+                }
+
+                // 順延方向一致性检测
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[3]) {
+
+                    // 顺序方向
+                    if (arcuIsConsistent(current, 128, d1[i], 0, i, 4) == 0) {
+                        checkFailed = 3;
+                        easyCheckFailed = 3;
+                    }
+                }
+
+                // 如果有前向，前向也需要一致
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[4]) {
+                    if (d1abs[i - 1] > averageDelta && d1[i - 1] * d1[i] < 0) {
+                        checkFailed = 4;
+                        easyCheckFailed = 4;
+                    }
+                }
+
+                // 极值点检查
+                // i是故障电弧发生点
+                int extIndex = faultIndex;
+                if (checkFailed == 0 && gCheckEnabled[5]) {
+
+                    extIndex = arcuExtremeInRange(current, length, faultIndex, gMinExtremeDis, averageDelta);
+
+                    if ((extIndex >= faultIndex + gMinExtremeDis)
+                            || (extIndex < faultIndex && extIndex + length >= faultIndex + gMinExtremeDis)) {
+                        // pass
+                    } else {
+                        // 距离极值点不足1/8周期，很可能是吸尘器开关电源等短尖周期的波形
+                        checkFailed = 5;
+                    }
+                }
+
+                // 宽度检查
+                // 有可能极值点通过，但波形从极值点迅速下降
+                if (checkFailed == 0 && gCheckEnabled[6]) {
+
+                    int width = arcuGetWidth(current, length, faultIndex);
+                    if (width >= gMinWidth) {
+                        // pass
+                    } else {
+                        checkFailed = 6;
+                    }
+                }
+
+                // 大跳跃数限制
+                if (checkFailed == 0 && gCheckEnabled[7]) {
+                    int biggerNum = arcuGetBigNum(d1abs, length, d1abs[i], 0.8f);
+                    if (biggerNum >= 3) {
+                        checkFailed = 7;
+                    }
+                }
+
+                // 离散跳跃check，此后的跳跃*Ratio不可以比当前跳跃还大
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[8]) {
+                    for (int j = i + 1; j < i + PARTIAL_MAX_INDEX && j < length; j++) {
+                        if (d1abs[j] * gResFollowJumpMaxRatio >= d1abs[i]) {
+                            checkFailed = 8;
+                            easyCheckFailed = 8;
+                            break;
+                        }
+                    }
+                }
+
+                if (checkFailed == 0) {
+                    resArcNum++;
+                }
+                if (easyCheckFailed == 0) {
+                    easyArcNum++;
+                }
+                i += ONE_EIGHT_PERIOD;
+            }
         }
 
         // 感性负载检查
@@ -551,6 +558,12 @@ void setArcInductJumpMinThresh(float inductJumpMinThresh) {
 
 void setArcFftEnabled(char fftEnabled) {
     gFftEnabled = fftEnabled;
+}
+
+void setArcCheckDisabled(int item) {
+    if (item >= CHECK_ITEM_NUM)
+        return;
+    gCheckEnabled[item] = 0;
 }
 
 int getArcAlgoVersion() {
