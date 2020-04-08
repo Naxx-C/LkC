@@ -19,12 +19,11 @@ static int gArc2NumRatioThresh = 40;
 static int gMaxSeriesThresh = 25;
 static float gResFollowJumpMaxRatio = 3.5f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
 static float gInductJumpRatio = 3.3f; // 感性负载最少跳变threshDelta的倍数
-static float gResJumpThresh = 0.9; // 阻性负载最小跳跃幅度，单位A
+static float gResJumpThresh = 1.0f; // 阻性负载最小跳跃幅度，单位A
 static float gInductJumpThresh = 2.5; // 阻性负载最小跳跃幅度，单位A
 static float gInductMaxJumpRatio = 0.462; // 感性负载跳变值至少满足电流峰值的百分比，取50%低一点的值
 static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至少满足最大跳变值得百分比
 static char gFftEnabled = 0;
-#define CHECK_ITEM_NUM  9
 static char gCheckEnabled[CHECK_ITEM_NUM];
 
 /**
@@ -245,8 +244,8 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
     float effValue = effCurrent >= 0 ? effCurrent : arcuEffectiveValue(current, length);
 
     float health = arcuGetHealth(d1, d1abs, length, averageDelta / 3);
-    if (maxD1abs > threshDelta * gInductJumpRatio && maxD1abs > 0.9f) {
-        pBigJumpCounter++;
+    if (maxD1abs > threshDelta * gInductJumpRatio && maxD1abs > gResJumpThresh) {
+        pBigJumpCounter[channel]++;
     }
     if (health >= 76.0f && effValue >= 1.5f) {
         // 最后3个点的电弧信息缺少，容易误判，忽略
@@ -254,49 +253,48 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         for (int i = 1; i < length - PARTIAL_MAX_INDEX; i++) {
             if (d1abs[i] > gResJumpRatio * threshDelta && d1abs[i] >= gResJumpThresh) {
 
-                int pointFileIndex = i;
                 int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
                 int faultIndex = i;
 
                 // 击穿前基本为平肩，不用跳跃过大
-                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[1]) {
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_PREJ]) {
                     if (d1abs[i - 1] >= threshDelta) {
-                        checkFailed = 1;
-                        easyCheckFailed = 1;
+                        checkFailed = ARC_CON_PREJ;
+                        easyCheckFailed = ARC_CON_PREJ;
                     }
                 }
 
                 // 正击穿时要求故障电弧点电压为正,取0.1为近似值
-                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[2]) {
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_PN]) {
                     if ((d1[i] > 0 && (current[i - 1] < -0.1f || current[i] < 0.1f))
                             || (d1[i] < 0 && (current[i - 1] > 0.1f || current[i] > -0.1f))) {
-                        checkFailed = 2;
-                        easyCheckFailed = 2;
+                        checkFailed = ARC_CON_PN;
+                        easyCheckFailed = ARC_CON_PN;
                     }
                 }
 
                 // 順延方向一致性检测
-                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[3]) {
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_CONS]) {
 
                     // 顺序方向
                     if (arcuIsConsistent(current, 128, d1[i], 0, i, 4) == 0) {
-                        checkFailed = 3;
-                        easyCheckFailed = 3;
+                        checkFailed = ARC_CON_CONS;
+                        easyCheckFailed = ARC_CON_CONS;
                     }
                 }
 
                 // 如果有前向，前向也需要一致
-                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[4]) {
+                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_PREC]) {
                     if (d1abs[i - 1] > averageDelta && d1[i - 1] * d1[i] < 0) {
-                        checkFailed = 4;
-                        easyCheckFailed = 4;
+                        checkFailed = ARC_CON_PREC;
+                        easyCheckFailed = ARC_CON_PREC;
                     }
                 }
 
                 // 极值点检查
                 // i是故障电弧发生点
                 int extIndex = faultIndex;
-                if (checkFailed == 0 && gCheckEnabled[5]) {
+                if (checkFailed == 0 && gCheckEnabled[ARC_CON_EXTR]) {
 
                     extIndex = arcuExtremeInRange(current, length, faultIndex, gMinExtremeDis, averageDelta);
 
@@ -305,36 +303,35 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                         // pass
                     } else {
                         // 距离极值点不足1/8周期，很可能是吸尘器开关电源等短尖周期的波形
-                        checkFailed = 5;
+                        checkFailed = ARC_CON_EXTR;
                     }
                 }
 
                 // 宽度检查
                 // 有可能极值点通过，但波形从极值点迅速下降
-                if (checkFailed == 0 && gCheckEnabled[6]) {
+                if (checkFailed == 0 && gCheckEnabled[ARC_CON_WIDT]) {
 
                     int width = arcuGetWidth(current, length, faultIndex);
                     if (width >= gMinWidth) {
                         // pass
                     } else {
-                        checkFailed = 6;
+                        checkFailed = ARC_CON_WIDT;
                     }
                 }
 
                 // 大跳跃数限制
-                if (checkFailed == 0 && gCheckEnabled[7]) {
+                if (checkFailed == 0 && gCheckEnabled[ARC_CON_BJ]) {
                     int biggerNum = arcuGetBigNum(d1abs, length, d1abs[i], 0.8f);
                     if (biggerNum >= 3) {
-                        checkFailed = 7;
+                        checkFailed = ARC_CON_BJ;
                     }
                 }
 
                 // 离散跳跃check，此后的跳跃*Ratio不可以比当前跳跃还大
-                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[8]) {
+                if (checkFailed == 0 && gCheckEnabled[ARC_CON_POSJ]) {
                     for (int j = i + 1; j < i + PARTIAL_MAX_INDEX && j < length; j++) {
                         if (d1abs[j] * gResFollowJumpMaxRatio >= d1abs[i]) {
-                            checkFailed = 8;
-                            easyCheckFailed = 8;
+                            checkFailed = ARC_CON_POSJ;
                             break;
                         }
                     }
@@ -408,10 +405,11 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
     gMoreInfoIndex[channel]++;
     if (gMoreInfoIndex[channel] >= MOREINFO_BUFF_NUM)
         gMoreInfoIndex[channel] = 0;
-    gIsStable[channel] = arcuIsStable(gEffBuff[channel], MOREINFO_BUFF_NUM, 0.2, 5);               // 稳态电流5%波动
+    // 稳态电流5%波动
+    gIsStable[channel] = arcuIsStable(gEffBuff[channel], MOREINFO_BUFF_NUM, 0.2, 5);
     if (gFftEnabled && oddFft != NULL) {
-        gIsHarmonicStable[channel] = arcuIsStable(gHarmonicBuff[channel],
-        MOREINFO_BUFF_NUM, 2, 18);                        // 谐波率18%波动
+        // 谐波率10%波动
+        gIsHarmonicStable[channel] = arcuIsStable(gHarmonicBuff[channel], MOREINFO_BUFF_NUM, 2, 10);
     }
 
     gArcBuff[channel][gArcBuffIndex[channel]] = (char) (resArcNum + inductArcNum);

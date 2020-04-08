@@ -42,7 +42,6 @@ int parse(char *csvPath, int offset, float *currents, int len) {
     }
     fclose(f);
     return counter;
-
 }
 
 // "F:\\data\\ArcfaultData\\20200120_Diantaolu\\datacombine\\elec_20200120105010.csv",
@@ -85,8 +84,9 @@ int main() {
             int i = 0;
 
             setArcFftEnabled(0);
-            setArcCheckDisabled(8);
-            setArcMinWidth(30);
+            setArcCheckDisabled(ARC_CON_POSJ);
+            setArcCheckDisabled(1);
+            setArcMinWidth(33);
 
             char ret = arcAlgoInit(CHANNEL);
             if (ret > 1) {
