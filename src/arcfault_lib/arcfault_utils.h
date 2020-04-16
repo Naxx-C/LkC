@@ -14,6 +14,8 @@ int arcuExtremeInRange(float* current, int currentLen, int arcFaultIndex, int ra
 int arcuIsMaxInRange(float * current, int currentLen, int arcFaultIndex, int range);
 int arcuGetBigNum(float* in, int len, float thresh, float ratio);
 char arcuIsStable(float * inputs, int len, float absThresh, int relativeRatio);
+float arcGetFluctuation(float *inputs, int inputLen, int start, int len, float ignoreThresh);
+float arcLastestFluctuation(float *inputs, int inputLen, int end, int len, float ignoreThresh);
 float arcuAbs(float val);
 float arcuSqrt(float val);
 #endif

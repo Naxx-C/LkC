@@ -5,6 +5,7 @@
 #include "dirent.h"
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 float current[128] = { -3.41796875, -3.41796875, -3.41796875, -3.46679688, -3.41796875, -3.41796875,
         -3.36914063, -3.515625, -3.27148438, -3.07617188, -2.83203125, -2.58789063, -2.39257813, -2.34375,
@@ -44,96 +45,118 @@ int parse(char *csvPath, int offset, float *currents, int len) {
     return counter;
 }
 
-// "F:\\data\\ArcfaultData\\20200120_Diantaolu\\datacombine\\elec_20200120105010.csv",
-// "F:\\data\\elecm\\typical\\qingbo\\monito13",
+//char *dirPath = "F:\\data\\ArcfaultData\\20200410\\diantaolu_gaodijiaoti_falsealarm";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200410\\cleaner_gaodijiaoti_falsealarm";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200331_Cleaner\\xichenqi_no_arc";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200120_Diantaolu\\datacombine";
+//char *dirPath = "F:\\data\\elecm\\0321_xichenqi";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200409\\cleaner_gaoditiaojie";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200409\\diantaolu_gaoditiaojie";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200409\\warmer_1k_arc";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200409\\cleaner_max_arc";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200409\\clearner_res";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\res_1.73kw_join_to_apart";
-//    char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\res_918w_join_to_apart\\";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\res_918w_join_to_apart\\";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_1.69kw_joint_to_apart";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_878kw_joint_to_apart";
-char *dirPath = "F:\\data\\ArcfaultData\\20200331_Cleaner\\xichenqi_resistor_arc";
-//    char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner\\";
-//    char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner_Resistor\\";
-//char *dirPath = "F:\\data\\ArcfaultData\\20200305_Resistance\\hairdryer_1.69kw_joint_to_apart";
+//char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner\\";
+//char *dirPath = "F:\\data\\ArcfaultData\\20191219_Cleaner_Resistor\\";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200331_Cleaner\\xichenqi_arc";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200331_Cleaner\\xichenqi_resistor_arc";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200410\\1kw_arc_alarm_normal";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200410\\2kw_arc_alarm_normal";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200410\\2kw_alarm_fail";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200410\\1kw_arc_alarm_fail";
+//char *dirPath = "F:\\data\\ArcfaultData\\20200410\\cleaner_arc_alarm_normal";
+char *dirPath = "F:\\data\\ArcfaultData\\20200410\\clearner_res_alarm_normal";
 const char *APP_BUILD_DATE = __DATE__;
+const int CHANNEL = 3;
 
 int main() {
+    setArcAlarmThresh(14);
+    setArcFftEnabled(0);
+    arcAlgoInit(CHANNEL);
+    // ArcFaultAlgo.setArcResJumpThresh(0.9f);
+    // ArcFaultAlgo.setArcCheckDisabled(ArcFaultAlgo.ARC_CON_POSJ);
+    setArcCheckDisabled(1);            // Cleaner_Resistor must be
+    setArcCheckDisabled(8);
+    setArcOverlayCheckEnabled(1);
+
+    char ret = arcAlgoInit(CHANNEL);
+
+    if (ret > 1) {
+        printf("some error\n");
+        return -1;
+    }
     DIR *dir = NULL;
-    const int CHANNEL = 1;
     struct dirent *entry;
 
     int totalArc[CHANNEL], alarmNum[CHANNEL];
     memset(totalArc, 0, sizeof(int) * CHANNEL);
     memset(alarmNum, 0, sizeof(int) * CHANNEL);
-    int pointNum = 0, fileIndex = 0;
-    if ((dir = opendir(dirPath)) == NULL) {
-        printf("opendir failed\n");
-    } else {
-        char csv[500];
-        while ((entry = readdir(dir)) != NULL) {
-            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0
-                    || !endWith(entry->d_name, ".csv")) ///current dir OR parrent dir
-                continue;
-            fileIndex = 0;
-            memset(csv, 0, sizeof(csv));
-            snprintf(csv, sizeof(csv) - 1, "%s\\%s", dirPath, entry->d_name);
+
+//    while (1) {            //TODO:loop test, to remove
+        int pointNum = 0, fileIndex = 0;
+        if ((dir = opendir(dirPath)) == NULL) {
+            printf("opendir failed\n");
+        } else {
+            char csv[500];
+            while ((entry = readdir(dir)) != NULL) {
+                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0
+                        || !endWith(entry->d_name, ".csv")) ///current dir OR parrent dir
+                    continue;
+                fileIndex = 0;
+                memset(csv, 0, sizeof(csv));
+                snprintf(csv, sizeof(csv) - 1, "%s\\%s", dirPath, entry->d_name);
 //            printf("filepath=%s filetype=%d\n", csv, entry->d_type);        //输出文件或者目录的名称
-            /**parse csv*/
-            float currents[128];
-            FILE *f = fopen(csv, "rb");
+                /**parse csv*/
+                float currents[128];
+                FILE *f = fopen(csv, "rb");
 //            FILE *f = fopen(csvPath, "rb");
-            int i = 0;
+                int i = 0;
 
-            setArcFftEnabled(0);
-            setArcCheckDisabled(ARC_CON_POSJ);
-            setArcCheckDisabled(1);
-            setArcMinWidth(33);
+                while (!feof(f) && !ferror(f)) {
+                    float cur, vol;
+                    fscanf(f, "%f,%f", &cur, &vol);
+                    currents[i++] = cur;
+                    fileIndex++;
+                    if (i >= 128) {
+                        int outArcNum[CHANNEL];
+                        int arcNum1s[CHANNEL];
+                        memset(outArcNum, 0, sizeof(int) * CHANNEL);
+                        for (int channel = 0; channel < CHANNEL; channel++) {
 
-            char ret = arcAlgoInit(CHANNEL);
-            if (ret > 1) {
-                printf("some error\n");
-                return -1;
-            }
-            while (!feof(f) && !ferror(f)) {
-                float cur, vol;
-                fscanf(f, "%f,%f", &cur, &vol);
-                currents[i++] = cur;
-                fileIndex++;
-                if (i >= 128) {
-                    int outArcNum[CHANNEL];
-                    int arcNum1s[CHANNEL];
-                    memset(outArcNum, 0, sizeof(int) * CHANNEL);
-                    for (int channel = 0; channel < CHANNEL; channel++) {
-//                    int n=0;while(1){int channel=0;
-//                            printf("%d\n",n++);
-                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
-                                &(outArcNum[channel]));
-                        alarmNum[channel] += alarm;
-                        totalArc[channel] += outArcNum[channel];
-                        //TODO:debug remove
-                        //if (alarm > 0)
-                        if (outArcNum[channel] > 0) {
-                            printf("file=%s index=%d num=%d\n", entry->d_name, fileIndex - 128,
-                                    outArcNum[channel]);
-                            // printf("arcNum1s=%d\n", arcNum1s[channel]);
+                            char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
+                                    &(outArcNum[channel]));
+
+                            alarmNum[channel] += alarm;
+                            totalArc[channel] += outArcNum[channel];
+                            //if (alarm > 0)
+                            if (outArcNum[channel] > 0) {
+                                printf("file=%s index=%d num=%d\n", entry->d_name, fileIndex - 128,
+                                        outArcNum[channel]);
+                                // printf("arcNum1s=%d\n", arcNum1s[channel]);
+                            }
+
                         }
+                        i = 0;
                     }
-                    i = 0;
+                    pointNum++;
                 }
-                pointNum++;
+                fclose(f);
+
             }
-            fclose(f);
-
+            for (int c = 0; c < CHANNEL; c++) {
+                printf("alarmNum=%d totalArc=%d pointNum=%d\n", alarmNum[c], totalArc[c], pointNum);
+            }
         }
-        for (int c = 0; c < CHANNEL; c++) {
-            printf("alarmNum=%d totalArc=%d pointNum=%d\n", alarmNum[c], totalArc[c], pointNum);
-        }
-    }
-    if (dir != NULL)
-        closedir(dir);
+        if (dir != NULL)
+            closedir(dir);
+        printf("sleep 1s\n");
+        usleep(10000);
 
-//    char *csvPath = "F:\\data\\ArcfaultData\\20191219_Cleaner\\elec_20191219165421.csv";
-//    char *csvPath = "F:\\data\\ArcfaultData\\20200120_Diantaolu\\datacombine\\elec_20200120105234.csv";
-//    char *csvPath = "F:\\data\\ArcfaultData\\20200120_Diantaolu\\datacombine\\elec_20200120105010.csv";
+//    } //TODO:loop test, to remove
 
 //    printf("version=%d\n", getArcAlgoVersion());
 //    printf("%s %d %s %s", __FILE__, __LINE__, __DATE__, __TIME__);

@@ -7,7 +7,7 @@
 #endif
 
 // 极值点在查找范围内，则认为是吸尘器等造成的电弧误报
-static int SEARCH_TOLERANCE = 5;
+static int SEARCH_TOLERANCE = 6;
 
 float arcuMean(float *inputs, int len) {
     float sum = 0;
@@ -17,7 +17,7 @@ float arcuMean(float *inputs, int len) {
     return sum / len;
 }
 
-float arcuEffectiveValue(float* inputs, int len) {
+float arcuEffectiveValue(float *inputs, int len) {
 
 #ifdef ARM_MATH_CM4
     float eff = 0;
@@ -31,7 +31,7 @@ float arcuEffectiveValue(float* inputs, int len) {
 #endif
 }
 
-float arcuThreshAverage(float* inputs, int len, float thresh) {
+float arcuThreshAverage(float *inputs, int len, float thresh) {
 
     float sum = 0;
     int counter = 0;
@@ -63,8 +63,7 @@ float arcuThreshAverage(float* inputs, int len, float thresh) {
 // float* x = { 0, -11, -11.5, -12, -10.5, -14 };
 // // float* x = { 0, 11, 11.5, 12, 10.5, 14 };
 // log(isConsistent(x, -1, 1.5, 1, 5));
-char arcuIsConsistent(float* current, int length, float direction, float thresh,
-        int startIndex, int checkNum) {
+char arcuIsConsistent(float *current, int length, float direction, float thresh, int startIndex, int checkNum) {
 
     if (startIndex + checkNum > length)
         return 0;
@@ -76,13 +75,11 @@ char arcuIsConsistent(float* current, int length, float direction, float thresh,
     for (int i = startIndex; i < endIndex; i++) {
         if (direction >= 0) {
             // 递增条件break：第一个条件是防止小的抖动；第二个条件是防止细微递减
-            if (current[i + 1] - current[i] < -thresh
-                    || current[i + 1] - current[startIndex] < -thresh)
+            if (current[i + 1] - current[i] < -thresh || current[i + 1] - current[startIndex] < -thresh)
                 return 0;
         } else {
             // 递减条件break
-            if (current[i + 1] - current[i] > thresh
-                    || current[i + 1] - current[startIndex] > thresh)
+            if (current[i + 1] - current[i] > thresh || current[i + 1] - current[startIndex] > thresh)
                 return 0;
         }
     }
@@ -91,7 +88,7 @@ char arcuIsConsistent(float* current, int length, float direction, float thresh,
 
 int WIDTH_SKIP = 0;
 
-int arcuGetWidth(float* current, int currentLen, int arcFaultIndex) {
+int arcuGetWidth(float *current, int currentLen, int arcFaultIndex) {
 
     if (arcFaultIndex >= currentLen)
         return -1;
@@ -121,7 +118,7 @@ int arcuGetWidth(float* current, int currentLen, int arcFaultIndex) {
     return (end - arcFaultIndex + 1);
 }
 
-int arcuGetHealth(float* delta, float* absDelta, int len, float thresh) {
+int arcuGetHealth(float *delta, float *absDelta, int len, float thresh) {
 
     int flip = 0;
     for (int i = 1; i < len; i++) {
@@ -132,7 +129,7 @@ int arcuGetHealth(float* delta, float* absDelta, int len, float thresh) {
     return (len - flip) * 100 / len;
 }
 
-int arcuExtremeInRange(float* current, int currentLen, int arcFaultIndex, int range, float averageDelta) {
+int arcuExtremeInRange(float *current, int currentLen, int arcFaultIndex, int range, float averageDelta) {
     if (arcFaultIndex < 1)
         return 1;
     float faultDelta = (float) (current[arcFaultIndex] - current[arcFaultIndex - 1]);
@@ -156,15 +153,13 @@ int arcuExtremeInRange(float* current, int currentLen, int arcFaultIndex, int ra
         if (i >= currentLen)
             i = 0;
         if ((current[i] - last1) * (last1 - last2) < 0
-                    && (arcuAbs(current[i] - last1) >= shakeThresh
-                            || arcuAbs(last1 - last2) >= shakeThresh)) {
+                && (arcuAbs(current[i] - last1) >= shakeThresh || arcuAbs(last1 - last2) >= shakeThresh)) {
             // shakeCounter++;
         }
         // if (shakeCounter >= 2)
         // break;
 
-        if ((direction > 0 && current[i] >= extreme)
-                || (direction < 0 && current[i] <= extreme)) {// 上升，寻找极大值;下降，寻找极小值
+        if ((direction > 0 && current[i] >= extreme) || (direction < 0 && current[i] <= extreme)) { // 上升，寻找极大值;下降，寻找极小值
             extreme = current[i];
             extIndex = i;
             mismatchCounter = 0;
@@ -190,7 +185,7 @@ int arcuExtremeInRange(float* current, int currentLen, int arcFaultIndex, int ra
 }
 
 // 极值点在查找范围内（ret=1），则认为是吸尘器等造成的电弧误报
-int arcuIsMaxInRange(float* current, int currentLen, int arcFaultIndex, int range) {
+int arcuIsMaxInRange(float *current, int currentLen, int arcFaultIndex, int range) {
 //    logd("arcFaultIndex=" + arcFaultIndex + " range=" + range);
     if (arcFaultIndex < 1)
         return 1;
@@ -206,8 +201,7 @@ int arcuIsMaxInRange(float* current, int currentLen, int arcFaultIndex, int rang
         if (i >= currentLen)
             i = 0;
 
-        if ((direction > 0 && current[i] >= extreme)
-                || (direction < 0 && current[i] <= extreme)) {// 上升，寻找极大值;下降，寻找极小值
+        if ((direction > 0 && current[i] >= extreme) || (direction < 0 && current[i] <= extreme)) { // 上升，寻找极大值;下降，寻找极小值
             extreme = current[i];
             extIndex = i;
             mismatchCounter = 0;
@@ -225,7 +219,7 @@ int arcuIsMaxInRange(float* current, int currentLen, int arcFaultIndex, int rang
     return 1;
 }
 
-int arcuGetBigNum(float* in, int len, float thresh, float ratio) {
+int arcuGetBigNum(float *in, int len, float thresh, float ratio) {
 
     int counter = 0;
     thresh *= ratio;
@@ -246,22 +240,92 @@ int arcuGetBigNum(float* in, int len, float thresh, float ratio) {
  *            相对比值波动，至少波动比例，百分比
  * @return
  */
-char arcuIsStable(float * inputs, int len, float absThresh, int relativeRatio) {
+char arcuIsStable(float *inputs, int len, float absThresh, int relativeRatio) {
 
-    float average = 0;
+    float average = 0, absAverage = 0;
     for (int i = 0; i < len; i++) {
         average += inputs[i];
     }
     average /= len;
+    absAverage = average >= 0 ? average : -average;
     for (int i = 0; i < len; i++) {
         float absDelta = inputs[i] - average;
         absDelta = absDelta > 0 ? absDelta : -absDelta;
 
-        if (absDelta > absThresh && absDelta * 100 > average * relativeRatio) {
+        if (absDelta > absThresh && absDelta * 100 > absAverage * relativeRatio) {
             return 0;
         }
     }
     return 1;
+}
+
+/**
+ *
+ * @param inputs
+ * @param inputLen
+ *            输入的长度
+ * @param start
+ *            计算的起点
+ * @param len
+ *            要计算的长度
+ * @param ignoreThresh
+ *            忽略多大的小波动
+ * @return 最大波动的百分比
+ */
+float arcGetFluctuation(float* inputs, int inputLen, int start, int len, float ignoreThresh) {
+    if (inputLen < len)
+    return 0;
+    float average = 0, absAverage = 0;
+    for (int i = start; i < start + len; i++) {
+        average += inputs[i % inputLen];
+    }
+    average /= len;
+    absAverage = average >= 0 ? average : -average;
+    float maxFluctuation = 0, tmp = 0;
+    for (int i = start; i < start + len; i++) {
+        float absDelta = inputs[i % inputLen] - average;
+        absDelta = absDelta > 0 ? absDelta : -absDelta;
+        tmp = absDelta / absAverage;
+        if (absDelta >= ignoreThresh && tmp > maxFluctuation) {
+            maxFluctuation = tmp;
+        }
+    }
+    return maxFluctuation * 100;
+}
+
+/***
+ * 为电弧记录量身定制
+ *
+ * @param inputs
+ * @param inputLen
+ * @param end
+ *            [start,end)不包含当前的值
+ * @param len
+ * @param ignoreThresh
+ * @return
+ */
+float arcLastestFluctuation(float *inputs, int inputLen, int end, int len, float ignoreThresh) {
+
+    if (inputLen < len)
+        return 0;
+    int start = end - len >= 0 ? end - len : end + inputLen - len;
+
+    float average = 0, absAverage = 0;
+    for (int i = start; i < start + len; i++) {
+        average += inputs[i % inputLen];
+    }
+    average /= len;
+    absAverage = average >= 0 ? average : -average;
+    float maxFluctuation = 0, tmp = 0;
+    for (int i = start; i < start + len; i++) {
+        float absDelta = inputs[i % inputLen] - average;
+        absDelta = absDelta > 0 ? absDelta : -absDelta;
+        tmp = absDelta / absAverage;
+        if (absDelta >= ignoreThresh && tmp > maxFluctuation) {
+            maxFluctuation = tmp;
+        }
+    }
+    return maxFluctuation * 100;
 }
 
 float arcuAbs(float val) {
@@ -274,6 +338,6 @@ float arcuSqrt(float val) {
     arm_sqrt_f32(val, &sqrt);
     return sqrt;
 #else
-    return (float)sqrt(val);
+    return (float) sqrt(val);
 #endif
 }
