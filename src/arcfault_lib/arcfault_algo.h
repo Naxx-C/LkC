@@ -3,7 +3,7 @@
 /**ATTENTION!!!
  * You must define APP_BUILD_DATE as following code in your project which includes this library
  * */
-//const char *APP_BUILD_DATE = __DATE__;
+// const char *APP_BUILD_DATE = __DATE__;
 
 int arcAnalyze(int channel, float *current, int length, int *outArcNum, int *thisPeriodNum);
 /**

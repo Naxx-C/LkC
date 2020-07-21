@@ -5,7 +5,6 @@
 #else
 #include "arm_math.h"
 #endif
-
 /**
  * judge by current sample
  *
