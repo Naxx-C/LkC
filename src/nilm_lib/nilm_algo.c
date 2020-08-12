@@ -176,7 +176,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         euDis = 3;            //to avoid useless exp cal cost
                     double possibility = 100 / pow(5, euDis);
 
-                    if (possibility > 0.7) {
+                    if (possibility > 70) {
                         MatchedAppliance ma;
                         ma.activePower = deltaActivePower;
                         ma.id = appliance.id;
@@ -186,21 +186,23 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 }
             }
 
-            int bestMatchedId = -1;
+            signed char bestMatchedId = -1;
             float possibility = 0;
-            getBestMatchedOnline(deltaActivePower, &bestMatchedId, &possibility);
+            getBestMatchedApp(deltaActivePower, &bestMatchedId, &possibility);
             updateOnlineAppPower(effU);            //矫正功率
 
             if (bestMatchedId > 0) {
                 OnlineAppliance oa;
                 oa.id = bestMatchedId;
-                oa.activePower = deltaActivePower;            //TODO:
+                oa.activePower = deltaActivePower;
                 oa.possiblity = possibility;
                 oa.poweronTime = utcTime;
                 oa.voltage = effU;
-                addToOnlineList(&oa);
+                updateOnlineList(&oa);
             }
             nilmEvent.possiblity = possibility;
+            nilmEvent.applianceId = bestMatchedId;
+            abnormalCheck(realPower);
         }
 
         // 稳态赋值或状态刷新

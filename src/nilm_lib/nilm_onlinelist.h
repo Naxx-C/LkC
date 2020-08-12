@@ -25,9 +25,10 @@ void addToMatchedList(MatchedAppliance *new);
 //gMatchedList为临时数组,使用前恢复
 void clearMatchedList();
 
-void getBestMatchedOnline(float deltaActivePower, signed char *bestMatchedId,float* possibility);
+void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId,float* possibility);
 
-void addToOnlineList(OnlineAppliance *new);
+void updateOnlineList(OnlineAppliance *new);
+void abnormalCheck(float totalPower);
 
 //gMatchedList为临时数组,使用前恢复
 void clearOnlineList();

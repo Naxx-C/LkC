@@ -1,5 +1,7 @@
 #include <string.h>
+#include <math.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include "nilm_onlinelist.h"
 #include "nilm_appliance.h"
 
@@ -50,7 +52,7 @@ void clearMatchedList() {
     gMatchedListWriteIndex = 0;
 }
 
-void getBestMatchedOnline(float deltaActivePower, signed char *bestMatchedId, float *possibility) {
+void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId, float *possibility) {
 
     int mostPossIndex = -1;
     float maxPoss = 0;
@@ -65,32 +67,24 @@ void getBestMatchedOnline(float deltaActivePower, signed char *bestMatchedId, fl
     if (deltaActivePower < 0) {
         for (int i = 0; i < gMatchedListCounter; i++) {
             MatchedAppliance *m = &(gMatchedList[i]);
+            if (m->id == gMatchedList[mostPossIndex].id)
+                continue;
             //移除时，优先判断为已经在线电器
-            if (isOnline(m->id)) {
-                if (isOnline(gMatchedList[mostPossIndex].id)
-                        && m->possiblity > gMatchedList[mostPossIndex].possiblity) {
-                    mostPossIndex = i;
-
-                } else if (!isOnline(gMatchedList[mostPossIndex].id)
-                        && m->possiblity >= gMatchedList[mostPossIndex].possiblity * 0.7f) {
-                    mostPossIndex = i;
-                }
+            if (isOnline(m->id) && !isOnline(gMatchedList[mostPossIndex].id)
+                    && m->possiblity >= gMatchedList[mostPossIndex].possiblity * 0.7f) {
+                mostPossIndex = i;
             }
         }
 
     } else {
         for (int i = 0; i < gMatchedListCounter; i++) {
             MatchedAppliance *m = &(gMatchedList[i]);
+            if (m->id == gMatchedList[mostPossIndex].id)
+                continue;
             //接入时，优先判断为已经在线电器
-            if (isOnline(m->id)) {
-                if (isOnline(gMatchedList[mostPossIndex].id)
-                        && m->possiblity > gMatchedList[mostPossIndex].possiblity) {
-                    mostPossIndex = i;
-
-                } else if (!isOnline(gMatchedList[mostPossIndex].id)
-                        && m->possiblity >= gMatchedList[mostPossIndex].possiblity * 0.95f) {
-                    mostPossIndex = i;
-                }
+            if (isOnline(m->id) && !isOnline(gMatchedList[mostPossIndex].id)
+                    && m->possiblity >= gMatchedList[mostPossIndex].possiblity * 0.95f) {
+                mostPossIndex = i;
             }
         }
     }
@@ -104,14 +98,21 @@ void getBestMatchedOnline(float deltaActivePower, signed char *bestMatchedId, fl
     }
 }
 
-void addToOnlineList(OnlineAppliance *new) {
+/**
+ *  new: 新事件
+ */
+void updateOnlineList(OnlineAppliance *new) {
+    if (new->id < 0)
+        return;
 
     if (isOnline(new->id)) {
         for (int i = 0; i < gOnlineListCounter; i++) {
             OnlineAppliance *o = &(gOnlineList[i]);
             if (o->id == new->id) {
+                float previousPower = o->activePower;
                 o->activePower += new->activePower;
-                if (o->activePower < 80) {
+                if (o->activePower < 80 || o->activePower < previousPower * 0.1) {
+                    //小功率移除
                     removeFromOnlineList(o->id);
                 }
                 break;
@@ -119,8 +120,11 @@ void addToOnlineList(OnlineAppliance *new) {
         }
 
     } else {
+        if (new->activePower < 0) {
+            return;
+        }
 
-        //list已满,移除时间最老的1个
+        //list已满,移除最老的1个
         if (gOnlineListCounter >= ONLINELIST_MAX_NUM) {
             for (int i = 0; i < gOnlineListCounter - 1; i++) {
                 memcpy(gOnlineList + i, gOnlineList + i + 1, sizeof(OnlineAppliance));
@@ -132,6 +136,7 @@ void addToOnlineList(OnlineAppliance *new) {
                 gOnlineListCounter++;
         }
     }
+
 }
 
 //gMatchedList为临时数组,使用前恢复
@@ -141,6 +146,9 @@ void clearOnlineList() {
 
 char isOnline(signed char id) {
 
+    if (id < 0) {
+        return 0;
+    }
     for (int i = 0; i < gOnlineListCounter; i++) {
         OnlineAppliance *o = &(gOnlineList[i]);
         if (o->id == id)
@@ -170,6 +178,7 @@ void getOnlineList(OnlineAppliance *onlineList, int *size) {
     *size = gOnlineListCounter;
 }
 
+//计算已识别电器的功率总和
 float getOnlineListPower() {
 
     float power = 0;
@@ -180,10 +189,37 @@ float getOnlineListPower() {
     return power;
 }
 
+//异常处理
+void abnormalCheck(float totalPower) {
+
+    if (totalPower > 0) {
+        float listPower = 0;
+        float deltaPower = 0, tmpMin = 100000;
+        signed char idMin = -1;
+        while (totalPower < (listPower = getOnlineListPower()) * 0.9) {
+            deltaPower = listPower - totalPower;
+
+            for (int i = 0; i < gOnlineListCounter; i++) {
+                OnlineAppliance *o = &(gOnlineList[i]);
+                float delta = 0;
+                if ((delta = abs(o->activePower - deltaPower)) < tmpMin) {
+                    idMin = o->id;
+                    tmpMin = delta;
+                }
+            }
+            if (idMin >= 0)
+                removeFromOnlineList(idMin);
+        }
+    }
+}
+
+//根据实时电压调整功率
 void updateOnlineAppPower(float voltage) {
 
     for (int i = 0; i < gOnlineListCounter; i++) {
         OnlineAppliance *o = &(gOnlineList[i]);
+        if (o->id < 0)
+            continue;
         o->activePower = voltage * voltage / o->voltage / o->voltage * o->activePower;
         o->voltage = voltage;
     }

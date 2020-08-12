@@ -83,6 +83,19 @@ int arcfault_main() {
     setArcCheckDisabled(ARC_CON_POSJ);
     setArcOverlayCheckEnabled(1);
 
+    //灵敏版参数
+    //    setArcResJumpRatio(2.5f);
+    //    setInductJumpRatio(2.2f);
+    //    setArcCheckDisabled(ARC_CON_PREJ);
+    //    setArcCheckDisabled(ARC_CON_POSJ);
+    //    setArcCheckDisabled(ARC_CON_EXTR);
+    //    setArcCheckDisabled(ARC_CON_WIDT);
+    //    setArcDelayCheckTime(0);
+    //    setArcFftEnabled(0);
+    //    setArcDutyRatioThresh(200);
+    //    setArc2NumRatioThresh(200);
+    //    setMaxSeriesThresh(200);
+
     char ret = arcAlgoInit(CHANNEL);
 
     if (ret > 1) {

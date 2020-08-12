@@ -2,8 +2,10 @@
 #define __NILM_APPLIANCE
 #include "nilm_feature.h"
 #define APP_NAME_LEN 16
-#define APP_FEATURE_NUM 3
+#define APP_FEATURE_NUM 5
+//空id
 #define NULL_APP_ID -1
+//#define BACKGROUND_LOAD_ID 0
 
 typedef struct {
     char name[APP_NAME_LEN];

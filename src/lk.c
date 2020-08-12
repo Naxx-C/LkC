@@ -88,33 +88,35 @@ int main() {
     o2.poweronTime=100086;
     o2.voltage = 200;
 
-    o3.activePower=1000;
+    o3.activePower=800;
     o3.id=2;
     o3.possiblity=0.8;
     o3.poweronTime=100086;
     o3.voltage = 200;
 
-    o4.activePower=1000;
+    o4.activePower=700;
     o4.id=2;
     o4.possiblity=0.8;
     o4.poweronTime=100086;
     o4.voltage = 200;
 
-    o5.activePower=-900;
+    o5.activePower=900;
     o5.id=3;
     o5.possiblity=0.8;
     o5.poweronTime=100086;
     o5.voltage = 200;
 
-    addToOnlineList(&o1);
-    addToOnlineList(&o2);
-    addToOnlineList(&o3);
-    addToOnlineList(&o4);
-    addToOnlineList(&o5);
-    printf("%f\n",getOnlineListPower());
-    updateOnlineAppPower(220);
-    printf("%f\n",getOnlineListPower());
+    updateOnlineList(&o1);
+    updateOnlineList(&o2);
+    updateOnlineList(&o3);
+    updateOnlineList(&o4);
+    updateOnlineList(&o5);
 
+    /***
+     * 识别流程开始
+     */
+    //根据最新电压更新在线电器列表的功率
+    updateOnlineAppPower(220);
     MatchedAppliance m1,m2,m3,m4,m5;
     m1.activePower=1000;
     m1.id=1;
@@ -133,18 +135,31 @@ int main() {
     m4.possiblity=0.79;
 
     m5.activePower=1000;
-    m5.id=3;
+    m5.id=9;
     m5.possiblity=0.9;
 
+    //本次的候选识别结果
     addToMatchedList(&m1);
     addToMatchedList(&m2);
     addToMatchedList(&m3);
     addToMatchedList(&m4);
     addToMatchedList(&m5);
 
+    //选取最大概率的识别结果
     signed char bestMatchedId = -1;
     float possibility = 0;
-    getBestMatchedOnline(1000, &bestMatchedId, &possibility);
+    getBestMatchedApp(-1000, &bestMatchedId, &possibility);
+
+    OnlineAppliance o;
+    o.activePower=-1000;
+    o.id=bestMatchedId;
+    o.possiblity=possibility;
+    o.poweronTime=123405;
+    o.voltage=210;
+
+    updateOnlineList(&o);
+    abnormalCheck(100.0f);
+
     printf("end\n");
     return 0;
 }
