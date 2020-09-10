@@ -23,6 +23,8 @@ int arcAnalyze(int channel, float *current, int length, int *outArcNum, int *thi
  */
 int arcAnalyzeInner(int channel, float *current, const int length, float effCurrent, float *oddFft,
         int *outArcNum, int *thisPeriodNum);
+int arcAnalyzeWithMsg(int channel, float *current, const int length, float effCurrent, float *oddFft,
+        int *outArcNum, int *thisPeriodNum, char *outMsg, int msgLen);
 void setArcMinExtremeDis(int minExtremeDis);
 void setArcMinWidth(int minWidth);
 void setArcDelayCheckTime(int delayCheckTime);
@@ -37,6 +39,8 @@ void setArcResJumpThresh(float resJumpThresh);
 void setArcInductJumpThresh(float inductJumpThresh);
 void setArcInductMaxJumpRatio(float inductMaxJumpRatio);
 void setArcInductJumpMinThresh(float inductJumpMinThresh);
+void setParallelArcThresh(float thresh);
+float getParallelArcThresh();
 void setArcFftEnabled(char fftEnabled);
 void setArcOverlayCheckEnabled(char enable);
 int arcAlgoStatus(void);
@@ -48,6 +52,7 @@ int arcAlgoStatus(void);
 #define ARC_CON_WIDT 6
 #define ARC_CON_BJ 7
 #define ARC_CON_POSJ 8
+#define ARC_CON_POSSUM 9
 void setArcCheckDisabled(int item);
 /**
  * @param channelNum

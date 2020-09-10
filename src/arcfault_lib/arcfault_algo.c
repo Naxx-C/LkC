@@ -4,12 +4,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 //#define Malloc(type,n)  (type *)malloc((n)*sizeof(type))
-#define CHECK_ITEM_NUM  9
+#define CHECK_ITEM_NUM  10
 /**
  * 可配区
  */
-static const char VERSION[] = { 1, 0, 0, 0 };
+static const char VERSION[] = { 3, 0, 0, 0 };
 static int gMinExtremeDis = 19; // 阻性电弧发生点到极值的最小距离
 static int gMinWidth = 35; // 阻性电弧发生点最少宽度
 static int gDelayCheckTime = 1000 / 20; // 延迟报警时间
@@ -26,6 +27,7 @@ static float gInductMaxJumpRatio = 0.462; // 感性负载跳变值至少满足�
 static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至少满足最大跳变值得百分比
 static char gFftEnabled = 0;
 static char gOverlayCheckEnabled = 0;
+static float gParallelArcThresh = 48.0f;
 static char gCheckEnabled[CHECK_ITEM_NUM];
 
 /**
@@ -49,15 +51,17 @@ static int *gArcNumAlarming = NULL; // 报警发生时的电弧数目
 static char **gResArcBuff = NULL;
 static char **gInductArcBuff = NULL;
 static int *gArcBuffIndex = NULL; // point to next write point
+static int *gEffMonoIncCounter = NULL;
+static int *gEffMonoDecCounter = NULL;
 static char **gEasyArcBuff = NULL;
 
-#define MOREINFO_BUFF_NUM 20
 static float **gEffBuff = NULL;
+static float **gAverageBuff = NULL;
 static float **gHarmonicBuff = NULL;
-static int *gMoreInfoIndex = NULL; // point to next write point
 
 static float *mLastPeriodPiont = NULL;
 static char *gIsFirst = NULL;
+static char gOutMsg[64] = { 0 };
 
 extern char *APP_BUILD_DATE;
 char gIsLibExpired = 1;
@@ -138,6 +142,12 @@ int arcAlgoInit(int channelNum) {
     gArcBuffIndex = (int*) malloc(sizeof(int) * gChannelNum);
     memset(gArcBuffIndex, 0, sizeof(int) * gChannelNum);
 
+    gEffMonoIncCounter = (int*) malloc(sizeof(int) * gChannelNum);
+    memset(gEffMonoIncCounter, 0, sizeof(int) * gChannelNum);
+
+    gEffMonoDecCounter = (int*) malloc(sizeof(int) * gChannelNum);
+    memset(gEffMonoDecCounter, 0, sizeof(int) * gChannelNum);
+
     gEasyArcBuff = (char**) malloc(sizeof(char*) * gChannelNum);
     for (int i = 0; i < gChannelNum; i++) {
         gEasyArcBuff[i] = (char*) malloc(sizeof(char) * CYCLE_NUM_1S);
@@ -146,25 +156,27 @@ int arcAlgoInit(int channelNum) {
 
     gEffBuff = (float**) malloc(sizeof(float*) * gChannelNum);
     for (int i = 0; i < gChannelNum; i++) {
-        gEffBuff[i] = (float*) malloc(sizeof(float) * MOREINFO_BUFF_NUM);
-        memset(gEffBuff[i], 0, sizeof(float) * MOREINFO_BUFF_NUM);
+        gEffBuff[i] = (float*) malloc(sizeof(float) * CYCLE_NUM_1S);
+        memset(gEffBuff[i], 0, sizeof(float) * CYCLE_NUM_1S);
+    }
+
+    gAverageBuff = (float**) malloc(sizeof(float*) * gChannelNum);
+    for (int i = 0; i < gChannelNum; i++) {
+        gAverageBuff[i] = (float*) malloc(sizeof(float) * CYCLE_NUM_1S);
+        memset(gAverageBuff[i], 0, sizeof(float) * CYCLE_NUM_1S);
     }
 
     gHarmonicBuff = (float**) malloc(sizeof(float*) * gChannelNum);
     for (int i = 0; i < gChannelNum; i++) {
-        gHarmonicBuff[i] = (float*) malloc(sizeof(float) * MOREINFO_BUFF_NUM);
-        memset(gHarmonicBuff[i], 0, sizeof(float) * MOREINFO_BUFF_NUM);
+        gHarmonicBuff[i] = (float*) malloc(sizeof(float) * CYCLE_NUM_1S);
+        memset(gHarmonicBuff[i], 0, sizeof(float) * CYCLE_NUM_1S);
     }
-
-    gMoreInfoIndex = (int*) malloc(sizeof(int) * gChannelNum);
-    memset(gMoreInfoIndex, 0, sizeof(int) * gChannelNum);
 
     mLastPeriodPiont = (float*) malloc(sizeof(float) * gChannelNum);
     memset(mLastPeriodPiont, 0, sizeof(float) * gChannelNum);
 
     gIsFirst = (char*) malloc(sizeof(char) * gChannelNum);
     memset(gIsFirst, 1, sizeof(char) * gChannelNum);
-
 
     memset(gCheckEnabled, 1, sizeof(char) * CHECK_ITEM_NUM);
 
@@ -201,6 +213,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
 
     // global timer
     gTimer[channel]++;
+    gOutMsg[0] = '\0';
     // to protect lib, add random alarm for every 2.6days and 4.1days
     if (gIsLibExpired && (gTimer[channel] % 11232000 == 11231999 || gTimer[channel] % 17712000 == 17711999)) {
         if (outArcNum != NULL)
@@ -244,31 +257,60 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
     float threshDelta = arcuThreshAverage(d1abs, length, averageDelta / 2); // 除去平肩部分
     float effValue = effCurrent >= 0 ? effCurrent : arcuEffectiveValue(current, length);
 
+    float averageValue = arcuMean(current, 128);
+    // 电流递增递减趋势判断
+    int lastArcBuffIndex = gArcBuffIndex[channel] >= 1 ? gArcBuffIndex[channel] - 1 : CYCLE_NUM_1S - 1;
+    if (effValue < gEffBuff[channel][lastArcBuffIndex] * 0.95f) {
+        gEffMonoDecCounter[channel]++;
+        gEffMonoIncCounter[channel] = 0;
+    } else if (effValue > gEffBuff[channel][lastArcBuffIndex] * 1.05f) {
+        gEffMonoIncCounter[channel]++;
+        gEffMonoDecCounter[channel] = 0;
+    } else {
+        gEffMonoIncCounter[channel] = 0;
+        gEffMonoDecCounter[channel] = 0;
+    }
+
     float health = arcuGetHealth(d1, d1abs, length, averageDelta / 3);
     if (maxD1abs > threshDelta * gResJumpRatio && maxD1abs > gResJumpThresh) {
         pBigJumpCounter[channel]++;
     }
-    if (health >= 76.0f && effValue >= 1.5f) {
+
+    // 凸点检测，容感性负载
+    if (maxD1abs >= 1.0f) {
+        int lastBigJumpIndex = -1;
+        double lastBigJumpVal = 0;
+        for (int i = 0; i < length; i++) {
+            if (d1abs[i] > averageDelta * 5
+                    || (abs(lastBigJumpVal) > averageDelta * 10 && d1abs[i] > averageDelta * 4)) {
+
+                if (lastBigJumpIndex >= 0 && d1[i] * lastBigJumpVal < 0 && i - lastBigJumpIndex <= 12
+                        && i - lastBigJumpIndex >= 4) {
+                    inductArcNum++;
+
+                    i += 32;
+                    lastBigJumpIndex = -1;
+                    lastBigJumpVal = 0;
+                    continue;
+                }
+                // 防止连续多个跳跃,在满足幅度要求下，取最近一个作为last
+                if (d1abs[i] > lastBigJumpVal / 2) {
+                    lastBigJumpIndex = i;
+                    lastBigJumpVal = d1[i];
+                }
+            }
+        }
+    }
+
+    // 阻性负载
+    int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
+    if (health >= 76.0f && effValue >= 1.5f && maxD1abs > 1.0f) {
         // 最后3个点的电弧信息缺少，容易误判，忽略
         const int PARTIAL_MAX_INDEX = 3;
         for (int i = 1; i < length - PARTIAL_MAX_INDEX; i++) {
             if (d1abs[i] > gResJumpRatio * threshDelta && d1abs[i] >= gResJumpThresh) {
 
-                int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
                 int faultIndex = i;
-                char maybeOverlay = 0;
-                if (gOverlayCheckEnabled
-                        && (current[i - 1] > maxPoint / 4 || current[i - 1] < minPoint / 4)) {
-                    maybeOverlay = 1;
-                }
-
-                // 击穿前基本为平肩，不用跳跃过大
-                if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_PREJ]) {
-                    if (d1abs[i - 1] >= threshDelta) {
-                        checkFailed = ARC_CON_PREJ;
-                        easyCheckFailed = ARC_CON_PREJ;
-                    }
-                }
 
                 // 正击穿时要求故障电弧点电压为正,取0.1为近似值
                 if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_PN]) {
@@ -303,9 +345,6 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_EXTR]) {
 
                     int minExtremeDis = gMinExtremeDis;
-                    if (maybeOverlay) {
-                        minExtremeDis /= 2;
-                    }
                     extIndex = arcuExtremeInRange(current, length, faultIndex, minExtremeDis, averageDelta);
 
                     if ((extIndex >= faultIndex + minExtremeDis)
@@ -322,13 +361,21 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_WIDT]) {
 
                     int minWidth = gMinWidth;
-                    if (maybeOverlay) {
-                        minWidth = gMinWidth / 2;
-                    }
                     if (arcuGetWidth(current, length, faultIndex) >= minWidth) {
                         // pass
                     } else {
                         checkFailed = ARC_CON_WIDT;
+                    }
+                }
+
+                // 离散跳跃check，后续加和
+                if (checkFailed == 0 && gCheckEnabled[ARC_CON_POSSUM]) {
+                    double sum = 0;
+                    for (int j = i + 1; j < i + 5 && j < length; j++) {
+                        sum += d1abs[j];
+                    }
+                    if (sum / d1abs[i] > 2) {
+                        break;
                     }
                 }
 
@@ -356,52 +403,11 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 if (easyCheckFailed == 0) {
                     easyArcNum++;
                 }
-                i += ONE_EIGHT_PERIOD;
+                i += 8;
             }
         }
 
-        // 感性负载检查
-        if (resArcNum == 0) {
-
-            if (maxD1abs > gInductJumpRatio * threshDelta && maxD1abs >= gInductJumpThresh
-                    && maxD1abs >= maxPoint * gInductMaxJumpRatio
-                    && maxD1abs >= -minPoint * gInductMaxJumpRatio) {
-                float lastBigJump = 0;
-                int lastBigJumpIndex = -1;
-                for (int i = 0; i < length; i++) {
-
-                    if (d1abs[i] > maxD1abs * gInductJumpMinThresh) {
-                        // 在正半周，跳变pair第一跳向下,第二跳向上
-                        // 或者跳完之后波形是顺着跳跃方向连续递减的
-                        // 两跳之间最多间隔7个点(必要条件)
-                        if (current[i] >= averageDelta) {
-                            // log(i + ": Pos half");
-                            if (((lastBigJump < 0 && d1[i] > 0)
-                                    || arcuIsConsistent(current, 128, d1[i], threshDelta, i, 5))
-                                    && lastBigJumpIndex >= 0
-                                    && (i - lastBigJumpIndex <= 7 || length + lastBigJumpIndex - i <= 7)
-                                    && lastBigJump * d1[i] < 0) {
-
-                                inductArcNum++;
-                            }
-
-                        } else if (current[i] <= -averageDelta) {
-                            // log(i + ": Neg half");
-                            if (((lastBigJump > 0 && d1[i] < 0)
-                                    || arcuIsConsistent(current, 128, d1[i], threshDelta, i, 5))
-                                    && lastBigJumpIndex >= 0
-                                    && (i - lastBigJumpIndex <= 7 || length + lastBigJumpIndex - i <= 7)
-                                    && lastBigJump * d1[i] < 0) {
-                                inductArcNum++;
-                            }
-                        }
-
-                        lastBigJump = d1[i];
-                        lastBigJumpIndex = i;
-                    }
-                }
-                inductArcNum = inductArcNum > 2 ? 2 : inductArcNum;
-            }
+        if (resArcNum > 0) {
         }
     } else {
     }
@@ -413,15 +419,13 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
 
     // 一些重要状态变量赋值
     float harmonic = 0;
-    gEffBuff[channel][gMoreInfoIndex[channel]] = effValue;
+    gEffBuff[channel][gArcBuffIndex[channel]] = effValue;
+    gAverageBuff[channel][gArcBuffIndex[channel]] = averageValue;
     if (gFftEnabled && oddFft != NULL) {
-        gHarmonicBuff[channel][gMoreInfoIndex[channel]] = 100
-                * (oddFft[1] + oddFft[2] + oddFft[3] + oddFft[4]) / (oddFft[0] + 0.001f);
-        harmonic = gHarmonicBuff[channel][gMoreInfoIndex[channel]];
+        gHarmonicBuff[channel][gArcBuffIndex[channel]] = 100 * (oddFft[1] + oddFft[2] + oddFft[3] + oddFft[4])
+                / (oddFft[0] + 0.001f);
+        harmonic = gHarmonicBuff[channel][gArcBuffIndex[channel]];
     }
-    gMoreInfoIndex[channel]++;
-    if (gMoreInfoIndex[channel] >= MOREINFO_BUFF_NUM)
-        gMoreInfoIndex[channel] = 0;
 
     gResArcBuff[channel][gArcBuffIndex[channel]] = (char) (resArcNum);
     gInductArcBuff[channel][gArcBuffIndex[channel]] = (char) (inductArcNum);
@@ -433,34 +437,54 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
 
     // 综合判断是否需要故障电弧报警
 
-    int resArcNum1S = 0, inductArcNum1S = 0;
-    int dutyCounter = 0, dutyRatio = 0, have2Number = 0, tmpSeries = 0, maxSeries = 0;
-    int start = -1, end = -1, totalLen = 0;
+    int resArcNum1S = 0, inductArcNum1S = 0, parallelArcNum1S = 0, unbalanceNum1S = 0;
+    int dutyCounter = 0, dutyRatio = 0, tmpSeries = 0, maxSeries = 0;
+    int resArcStart = -1, resArcEnd = -1, inductArcStart = -1, inductArcEnd = -1, resArcLen = 0,
+            inductArcLen = 0;
     for (int i = gArcBuffIndex[channel]; i < gArcBuffIndex[channel] + CYCLE_NUM_1S; i++) {
         int index = i % CYCLE_NUM_1S;
         resArcNum1S += gResArcBuff[channel][index];
         inductArcNum1S += gInductArcBuff[channel][index];
-        if (gEasyArcBuff[channel][index] > 0) {
-            dutyCounter++;
-            if (gEasyArcBuff[channel][index] > 1)
-                have2Number++;
-            if (start < 0) {
-                start = i;
-            }
-            end = i;
-            tmpSeries++;
-            if (tmpSeries > maxSeries)
-                maxSeries = tmpSeries;
-        } else {
-            tmpSeries = 0;
+        if (gEffBuff[channel][index] >= gParallelArcThresh) {
+            parallelArcNum1S++;
         }
+        if (gAverageBuff[channel][index] >= 1) {
+            unbalanceNum1S++;
+        }
+        if (gResArcBuff[channel][index] > 0) {
+            if (resArcStart < 0) {
+                resArcStart = i;
+            }
+            resArcEnd = i;
+        }
+        if (gInductArcBuff[channel][index] > 0) {
+            if (inductArcStart < 0) {
+                inductArcStart = i;
+            }
+            inductArcEnd = i;
+        }
+
+        // if (gResArcBuff[channel][index] > 0) {
+        // dutyCounter++;
+        //
+        // if (start < 0) {
+        // start = i;
+        // }
+        // end = i;
+        // tmpSeries++;
+        // if (tmpSeries > maxSeries)
+        // maxSeries = tmpSeries;
+        // } else {
+        // tmpSeries = 0;
+        // }
     }
-    totalLen = end - start + 1;
-    if (end >= start) {
-        dutyRatio = (dutyCounter * 100) / totalLen;
+    inductArcLen = inductArcEnd - inductArcStart + 1;
+    resArcLen = resArcEnd - resArcStart + 1;
+    if (resArcEnd >= resArcStart) {
+        dutyRatio = (dutyCounter * 100) / resArcLen;
     }
-    // 给感性电弧1.5倍的额外权重,保障即使9个及以下的感性电弧也不会报警
-    int arcNum1S = resArcNum1S + inductArcNum1S * 3 / 2;
+
+    int arcNum1S = resArcNum1S + inductArcNum1S + parallelArcNum1S;
     if (outArcNum != NULL)
         *outArcNum = arcNum1S;
     // 记录当前周期128个点的电弧数
@@ -468,27 +492,31 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         *thisPeriodNum = resArcNum + inductArcNum;
 
     // 检测到电弧14个->进入待确认状态->在待确认期间发现不符合条件直接进入免疫->切出稳态后再继续进入正常检测期
-    int fluctCheckEnd = gMoreInfoIndex[channel], fluctCheckLen = MOREINFO_BUFF_NUM;
+    int fluctCheckEnd = gArcBuffIndex[channel], fluctCheckLen = CYCLE_NUM_1S;   // totalLen > 3 ? totalLen - 3
     switch (gStatus[channel]) {
     case STATUS_NORMAL:
         // 进入免疫状态：1.占空比过大 2.一个周期检测到双弧超过40% 3.最大连续序列过长
         if (arcNum1S >= gAlarmThresh) {
-            // 占空比不可以太高；1个全波内同时检测出2个电弧的比例不能太高；最大连续序列不能太大；高次谐波比不能是稳定态
-            if (dutyRatio >= gDutyRatioThresh || have2Number * 100 / totalLen >= gArc2NumRatioThresh
-                    || maxSeries >= gMaxSeriesThresh
-                    || (gFftEnabled && arcLastestFluctuation(gHarmonicBuff[channel],
-                    MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
+            // 全是阻性负载电弧的话，要求基本稳定
+            if (inductArcNum1S == 0
+                    && arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen,
+                            0.2f) >= 8) {
                 gStatus[channel] = STATUS_IMMUNE;
                 break;
             }
-            // 全是阻性负载电弧的话，要求基本稳定
-            if (inductArcNum1S == 0 && arcLastestFluctuation(gEffBuff[channel],
-            MOREINFO_BUFF_NUM, fluctCheckEnd, MOREINFO_BUFF_NUM, 0.2f) >= 45) {
-                break;
-            }
+
             gWatingTime[channel] = gTimer[channel];
             gStatus[channel] = STATUS_WAITING_CHECK;
             gArcNumAlarming[channel] = arcNum1S;                        // 记录当前电弧数目，留做报警时传递
+        } else if (inductArcNum1S >= 3 && inductArcEnd - inductArcStart >= 6) {
+
+            double averageBuffFluct = arcLastestFluctuation(gAverageBuff[channel],
+            CYCLE_NUM_1S, (inductArcEnd + 1) % CYCLE_NUM_1S, inductArcLen, 0.2f);
+            if (averageBuffFluct < 10)
+                break;
+            gWatingTime[channel] = gTimer[channel];
+            gStatus[channel] = STATUS_WAITING_CHECK;
+            gArcNumAlarming[channel] = 14;                        // 记录当前电弧数目，留做报警时传递
         }
         break;
     case STATUS_WAITING_CHECK:
@@ -498,31 +526,51 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         }
         if (gTimer[channel] - gWatingTime[channel] > gDelayCheckTime) {
             gStatus[channel] = STATUS_NORMAL;
-            if (effValue > 1.5f) {
-                pAlarmCounter[channel]++;
-                if (outArcNum != NULL)
-                    *outArcNum = gArcNumAlarming[channel]; // 报警时使用确认点时记录的数目
-                return 1;
-            }
-        } else if (dutyRatio >= gDutyRatioThresh || have2Number * 100 / totalLen >= gArc2NumRatioThresh
-                || maxSeries >= gMaxSeriesThresh
-                || (gFftEnabled && resArcNum1S >= gAlarmThresh / 3 && harmonic < 15
-                        && arcLastestFluctuation(gHarmonicBuff[channel],
-                        MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
+            pAlarmCounter[channel]++;
+            if (outArcNum != NULL)
+                *outArcNum = gArcNumAlarming[channel]; // 报警时使用确认点时记录的数目
+            return 1;
+
+        } else if (inductArcNum1S == 0 && effValue > 1
+                && (gEffMonoDecCounter[channel] == 0 || gEffMonoDecCounter[channel] >= 3)
+                && arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen, 0.2f)
+                        >= 8) {
             gStatus[channel] = STATUS_IMMUNE;
             break;
         }
         break;
     case STATUS_IMMUNE:
         // 电流波动率超过5%或者谐波波动率超过10%
-        if (arcLastestFluctuation(gEffBuff[channel], MOREINFO_BUFF_NUM, gMoreInfoIndex[channel],
-        MOREINFO_BUFF_NUM, 0.2f) > 5 || (gFftEnabled && arcLastestFluctuation(gHarmonicBuff[channel],
-        MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) > 10)) {
+        if (arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen, 0.2f) > 5) {
             gStatus[channel] = STATUS_NORMAL;
         }
         break;
     }
+    // 并联电弧
+    if ((parallelArcNum1S >= 7 && (resArcNum1S + inductArcNum1S) >= 1 && unbalanceNum1S >= 1)
+            || (parallelArcNum1S >= 6 && (resArcNum1S + inductArcNum1S) >= 2 && unbalanceNum1S >= 2)) {
+        return 1;
+    }
+    if (checkFailed > 0 || inductArcNum1S > 0) {
+        snprintf(gOutMsg, 64, "ef=%.1f cf=%d ra=%d ia=%d\0", effValue, checkFailed, resArcNum, inductArcNum);
+    }
     return 0;
+}
+
+/**
+ * if no msg, outMsg[0] will be set to '\0';
+ */
+int arcAnalyzeWithMsg(int channel, float *current, const int length, float effCurrent, float *oddFft,
+        int *outArcNum, int *thisPeriodNum, char *outMsg, int msgLen) {
+    int ret = arcAnalyzeInner(channel, current, length, effCurrent, oddFft, outArcNum, thisPeriodNum);
+    if (outMsg != NULL) {
+        if (strlen(gOutMsg) > 0) {
+            strncpy(outMsg, gOutMsg, msgLen < sizeof(gOutMsg) ? msgLen : sizeof(gOutMsg));
+        } else {
+            outMsg[0] = '\0';
+        }
+    }
+    return ret;
 }
 
 void setArcMinExtremeDis(int minExtremeDis) {
@@ -589,6 +637,14 @@ void setArcCheckDisabled(int item) {
     if (item >= CHECK_ITEM_NUM)
         return;
     gCheckEnabled[item] = 0;
+}
+
+void setParallelArcThresh(float thresh) {
+    gParallelArcThresh = thresh;
+}
+
+float getParallelArcThresh() {
+    return gParallelArcThresh;
 }
 
 void setArcOverlayCheckEnabled(char enable) {

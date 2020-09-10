@@ -70,18 +70,40 @@ static int parse(char *csvPath, int offset, float *currents, int len) {
 //char *dirPath = "F:\\data\\ArcfaultData\\20200410\\2kw_alarm_fail";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200410\\1kw_arc_alarm_fail";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200410\\cleaner_arc_alarm_normal";
-static char *dirPath = "F:\\data\\ArcfaultData\\20200410\\clearner_res_alarm_normal";
+//static char *dirPath = "F:\\data\\ArcfaultData\\20200410\\clearner_res_alarm_normal";
+
+/**3cf*/
+//串联碳化
+//static char *dirPath = "F:\\Tmp\\4kVA0.3";
+//static char *dirPath = "F:\\Tmp\\4kVA0.7";
+//static char *dirPath = "F:\\Tmp\\4kVA1";
+//static char *dirPath = "F:\\Tmp\\10kVA0.3";
+//static char *dirPath = "F:\\Tmp\\10kVA0.7";
+//static char *dirPath = "F:\\Tmp\\10kVA1";
+
+//并联金属接触
+//static char *dirPath = "F:\\Tmp\\3kVA_binglian_0.7";
+//static char *dirPath = "F:\\Tmp\\3kVA_binglian_1";
+//static char *dirPath = "F:\\Tmp\\5kVA_binglian_0.7";
+//static char *dirPath = "F:\\Tmp\\5kVA_binglian_1";
+//static char *dirPath = "F:\\Tmp\\20200819_3kVA0.7(Fail)";
+static char *dirPath = "F:\\data\\tmp\\elec";
+//负载抑制
+//static char *dirPath = "F:\\Tmp\\restrictload_xialuzukang";
+
+//误报警测试
+//static char *dirPath = "F:\\Tmp\\falsealarm_cleaner";
+
 static const int CHANNEL = 3;
 
 int arcfault_main() {
-    setArcAlarmThresh(14);
-    setArcFftEnabled(0);
+    setArcAlarmThresh(10);
     arcAlgoInit(CHANNEL);
-    // ArcFaultAlgo.setArcResJumpThresh(0.9f);
-    // ArcFaultAlgo.setArcCheckDisabled(ArcFaultAlgo.ARC_CON_POSJ);
-    setArcCheckDisabled(ARC_CON_PREJ); // Cleaner_Resistor must be
+    setArcResJumpRatio(2.8f);
+    setArcInductJumpRatio(2.8f);
     setArcCheckDisabled(ARC_CON_POSJ);
-    setArcOverlayCheckEnabled(1);
+    setArcCheckDisabled(ARC_CON_BJ);
+    setParallelArcThresh(48);
 
     //灵敏版参数
     //    setArcResJumpRatio(2.5f);
@@ -138,10 +160,13 @@ int arcfault_main() {
                     int outArcNum[CHANNEL];
                     int arcNum1s[CHANNEL];
                     memset(outArcNum, 0, sizeof(int) * CHANNEL);
+                    char outMsg[64]={0};
                     for (int channel = 0; channel < CHANNEL; channel++) {
+                        char alarm = arcAnalyzeWithMsg(channel, currents, 128, -1, NULL, &(arcNum1s[channel]),
+                                &(outArcNum[channel]), outMsg, 63);
 
-                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
-                                &(outArcNum[channel]));
+                        if (strlen(outMsg) > 0)
+                            printf("%s\n", outMsg);
 
                         alarmNum[channel] += alarm;
                         totalArc[channel] += outArcNum[channel];
