@@ -46,6 +46,20 @@ void addToMatchedList(MatchedAppliance *new) {
     }
 }
 
+void fillInWaitingCheckInfos(signed char *possibleIds, int *countdownTimer, int size, int utcTime) {
+
+    int num = size < gMatchedListCounter ? size : gMatchedListCounter;
+
+    for (int i = 0; i < num; i++) {
+        MatchedAppliance *m = &(gMatchedList[i]);
+        possibleIds[i] = m->id;
+        ApplianceAdditionalInfo *info = getApplianceAdditionalInfo(m->id);
+        if (info != NULL) {
+            countdownTimer[i] = info->minUseTime;
+        }
+    }
+}
+
 //gMatchedList为临时数组,使用前恢复
 void clearMatchedList() {
     gMatchedListCounter = 0;
@@ -75,7 +89,6 @@ void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId, float
                 mostPossIndex = i;
             }
         }
-
     } else {
         for (int i = 0; i < gMatchedListCounter; i++) {
             MatchedAppliance *m = &(gMatchedList[i]);
@@ -139,7 +152,29 @@ void updateOnlineList(OnlineAppliance *new) {
 
 }
 
-//gMatchedList为临时数组,使用前恢复
+/**
+ *  更新在线列表里的功耗
+ *  TODO: 时间是否会存在不稳定或跳变？
+ *  totalPowerCost: 时间段内总功耗，单位kws
+ *  lastUpdatedActivePower: 上一次更新功耗时的线路总的有功功率
+ */
+static int gLastPowercostUpdateTime = 0;
+void updatePowercost(int utcTime, float *totalPowerCost, float lastUpdatedActivePower) {
+
+    int timeDelta = utcTime - gLastPowercostUpdateTime;
+    if (timeDelta > 0 && timeDelta <= 30) { //限定为[0,30s],防止时间错乱带来的重大影响
+
+        *totalPowerCost += lastUpdatedActivePower / 1000 * (utcTime - gLastPowercostUpdateTime);
+        for (int i = 0; i < gOnlineListCounter; i++) {
+            OnlineAppliance *o = &(gOnlineList[i]);
+//            o->powerCost += o->estimatedActivePower / 1000 * (utcTime - gLastPowercostUpdateTime);
+            o->powerCost += o->activePower / 1000 * (utcTime - gLastPowercostUpdateTime);
+        }
+    }
+    gLastPowercostUpdateTime = utcTime;
+}
+
+//清空在线列表
 void clearOnlineList() {
     gOnlineListCounter = 0;
 }
@@ -202,7 +237,7 @@ void abnormalCheck(float totalPower) {
             for (int i = 0; i < gOnlineListCounter; i++) {
                 OnlineAppliance *o = &(gOnlineList[i]);
                 float delta = 0;
-                if ((delta = abs(o->activePower - deltaPower)) < tmpMin) {
+                if ((delta = fabs(o->activePower - deltaPower)) < tmpMin) {
                     idMin = o->id;
                     tmpMin = delta;
                 }

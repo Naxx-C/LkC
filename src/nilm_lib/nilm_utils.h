@@ -67,6 +67,7 @@ void insertFifoBuff(float buff[], int buffSize, float newData[], int dataLen);
 // 只插入一条，最新插入的数据排在buff后面
 void insertFifoBuffOne(float buff[], int buffSize, float newData);
 
+void insertFifoCommon(char *buff, int buffSize, char *newData, int dataLen);
 /**
  * cosine相似度,[-1,1]
  */

@@ -7,6 +7,7 @@
 #include "nilm_algo.h"
 #include "nilm_idmap.h"
 #include "nilm_onlinelist.h"
+#include <sys/time.h>
 
 const char *APP_BUILD_DATE = __DATE__;
 extern int arcfault_main();
@@ -39,13 +40,59 @@ float current[128];
 float voltage[128];
 float oddFft[5] = { 3.08, 0.97, 0.29, 0.11, 0.06 };
 
-void setFakeValue(float data[128],float val) {
-    for(int i=0;i<128;i++){
+void setFakeValue(float data[128], float val) {
+    for (int i = 0; i < 128; i++) {
         data[i] = val;
     }
 }
+
+#define ALL_FILE_NUM  100  //文件个数
+
+#pragma pack(1)
+
+typedef struct {
+    signed char id;                       //ID号
+    char name[16];                      //电器名称
+    float oddFft[5];    //特征参数
+    float powerFactor;
+    float pulseI;
+    float activePower;
+} FeatureData_TypeDef;
+
+#pragma pack()
+
+//结构体赋值 ，一个文件对应一个结构体,各数组中的ID、电器名称可重复
+FeatureData_TypeDef FeatureData[ALL_FILE_NUM];
+void initFeature() {
+    FeatureData[0].id = 1;
+    strncpy(FeatureData[0].name, "我是中国人", 15);
+    FeatureData[0].oddFft[0] = 1;
+    FeatureData[0].oddFft[1] = 1;
+    FeatureData[0].oddFft[2] = 1;
+    FeatureData[0].oddFft[3] = 1;
+    FeatureData[0].oddFft[4] = 1;
+    FeatureData[0].powerFactor = 1;
+    FeatureData[0].pulseI = 1;
+    FeatureData[0].activePower = 1;
+}
+
+typedef struct {
+
+    float a; // delta active power
+    int b;
+    char c[2]; // powerline's total power
+} __attribute__ ((packed)) TEST;
+
+TEST test[3];
 int main() {
 
+//    struct timeval tv_begin, tv_end;
+//    gettimeofday(&tv_begin, NULL);
+//    gettimeofday(&tv_end, NULL);
+//    printf("%ld\n",tv_end.tv_usec);
+//    printf("%ld %ld\n", (tv_end.tv_sec - tv_begin.tv_sec),(tv_end.tv_usec - tv_begin.tv_usec));
+    //    arcfault_main();
+    return 0;
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 1, "RadiantCooker", strlen("RadiantCooker"));
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 2, "Cleaner", strlen("Cleaner"));
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 3, "Microwave", strlen("Microwave"));
@@ -75,35 +122,35 @@ int main() {
 //        nilmAnalyze(current, voltage, 128, 1593589351, -1, -1, -1, oddFft);
 //    }
 
-    OnlineAppliance o1,o2,o3,o4,o5;
-    o1.activePower=1000;
-    o1.id=1;
-    o1.possiblity=0.8;
-    o1.poweronTime=100086;
+    OnlineAppliance o1, o2, o3, o4, o5;
+    o1.activePower = 1000;
+    o1.id = 1;
+    o1.possiblity = 0.8;
+    o1.poweronTime = 100086;
     o1.voltage = 200;
 
-    o2.activePower=1000;
-    o2.id=2;
-    o2.possiblity=0.8;
-    o2.poweronTime=100086;
+    o2.activePower = 1000;
+    o2.id = 2;
+    o2.possiblity = 0.8;
+    o2.poweronTime = 100086;
     o2.voltage = 200;
 
-    o3.activePower=800;
-    o3.id=2;
-    o3.possiblity=0.8;
-    o3.poweronTime=100086;
+    o3.activePower = 800;
+    o3.id = 2;
+    o3.possiblity = 0.8;
+    o3.poweronTime = 100086;
     o3.voltage = 200;
 
-    o4.activePower=700;
-    o4.id=2;
-    o4.possiblity=0.8;
-    o4.poweronTime=100086;
+    o4.activePower = 700;
+    o4.id = 2;
+    o4.possiblity = 0.8;
+    o4.poweronTime = 100086;
     o4.voltage = 200;
 
-    o5.activePower=900;
-    o5.id=3;
-    o5.possiblity=0.8;
-    o5.poweronTime=100086;
+    o5.activePower = 900;
+    o5.id = 3;
+    o5.possiblity = 0.8;
+    o5.poweronTime = 100086;
     o5.voltage = 200;
 
     updateOnlineList(&o1);
@@ -117,26 +164,26 @@ int main() {
      */
     //根据最新电压更新在线电器列表的功率
     updateOnlineAppPower(220);
-    MatchedAppliance m1,m2,m3,m4,m5;
-    m1.activePower=1000;
-    m1.id=1;
-    m1.possiblity=0.8;
+    MatchedAppliance m1, m2, m3, m4, m5;
+    m1.activePower = 1000;
+    m1.id = 1;
+    m1.possiblity = 0.8;
 
-    m2.activePower=1000;
-    m2.id=2;
-    m2.possiblity=0.8;
+    m2.activePower = 1000;
+    m2.id = 2;
+    m2.possiblity = 0.8;
 
-    m3.activePower=1000;
-    m3.id=2;
-    m3.possiblity=0.85;
+    m3.activePower = 1000;
+    m3.id = 2;
+    m3.possiblity = 0.85;
 
-    m4.activePower=1000;
-    m4.id=2;
-    m4.possiblity=0.79;
+    m4.activePower = 1000;
+    m4.id = 2;
+    m4.possiblity = 0.79;
 
-    m5.activePower=1000;
-    m5.id=9;
-    m5.possiblity=0.9;
+    m5.activePower = 1000;
+    m5.id = 9;
+    m5.possiblity = 0.9;
 
     //本次的候选识别结果
     addToMatchedList(&m1);
@@ -151,11 +198,11 @@ int main() {
     getBestMatchedApp(-1000, &bestMatchedId, &possibility);
 
     OnlineAppliance o;
-    o.activePower=-1000;
-    o.id=bestMatchedId;
-    o.possiblity=possibility;
-    o.poweronTime=123405;
-    o.voltage=210;
+    o.activePower = -1000;
+    o.id = bestMatchedId;
+    o.possiblity = possibility;
+    o.poweronTime = 123405;
+    o.voltage = 210;
 
     updateOnlineList(&o);
     abnormalCheck(100.0f);

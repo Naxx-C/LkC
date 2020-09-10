@@ -9,22 +9,22 @@
 #include "nilm_appliance.h"
 #include "nilm_onlinelist.h"
 
-static float PI = 3.14159265f;
+#define PI 3.14159265f
+#define HOUR 3600
+#define DAY (3600*24)
 const static char VERSION[] = { 1, 0, 0, 0 };
 
-static const int EFF_BUFF_NUM = 50 * 3; // effective current buffer NUM
-static float gActivePBuff[150];
+#define EFF_BUFF_NUM (50 * 3) // effective current buffer NUM
+static float gActivePBuff[EFF_BUFF_NUM];
 
-static const int BUFF_NUM = 640;
-static float gIBuff[640]; // FIFO buff, pos0是最老的数据
-static float gUBuff[640];
-static int gBuffIndex = 0; // point to next write point
-static float gLastStableIBuff[640];
-static float gLastStableUBuff[640];
+#define BUFF_NUM 512
+static float gIBuff[BUFF_NUM]; // FIFO buff, pos0是最老的数据
+static float gUBuff[BUFF_NUM];
+static float gLastStableIBuff[BUFF_NUM];
+static float gLastStableUBuff[BUFF_NUM];
 static float gLastStableIEff = 0;
 static float gLastStableUEff = 0;
-static const int DELTA_BUFF_NUM = 256;
-static float gDeltaIBuff[640];
+static float gDeltaIBuff[BUFF_NUM];
 
 static int gLastStable = 1; // 上个周期的稳态情况
 
@@ -34,20 +34,22 @@ static float gIPulse = 0; // 脉冲电流比
 static float gTransitTmpIMax = 0;
 static float gOddFft[5]; // 13579次谐波
 static int gTimer = 0;
-const static int PF_INDEX = 5;
-const static int PULSE_I_INDEX = 6;
-const static int ACTIVE_P_INDEX = 7;
+static float gTotalPowerCost = 0; //kws
 
 static float gLastStableActivePower = 0;
 
-const static int NILMEVENT_MAX_NUM = 100; // 最多储存的事件
-static NilmEvent gNilmEvents[100];
-static int gNilmEventWriteIndex = 0;
+#define NILMEVENT_MAX_NUM   100 // 最多储存的事件
+static NilmEvent gNilmEvents[NILMEVENT_MAX_NUM];
+#define FOOTPRINT_SIZE 100
+static NilmEventFootprint gFootprints[FOOTPRINT_SIZE]; //存储事件足迹
+static int gNilmWorkEnv = ENV_SIMPLE_TEST;
+static int gNilmMinEventStep = 70;
 
 const static int MAX_APPLIANCE_NUM = 100;
 NilmAppliance gNilmAppliances[100];
 int gAppliancesWriteIndex = 0;    //init 0
 int gAppliancesCounter = 0;    //init 0
+
 NilmAppliance* createNilmAppliance(char name[], int nameLen, char id, float accumulatedPower) {
 
     if (gAppliancesWriteIndex >= MAX_APPLIANCE_NUM)
@@ -70,6 +72,7 @@ NilmAppliance* createNilmAppliance(char name[], int nameLen, char id, float accu
     return na;
 }
 
+// 20ms调用一次
 int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float effCurrent, float effVoltage,
         float realPower, float oddFft[]) {
     // global timer
@@ -82,6 +85,8 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     insertFifoBuff(gIBuff, BUFF_NUM, current, length);
     insertFifoBuff(gUBuff, BUFF_NUM, voltage, length);
 
+    //首先更新功耗数据
+    updatePowercost(utcTime, &gTotalPowerCost, gActivePBuff[EFF_BUFF_NUM - 1]);
     // 当前有功功率
     float activePower = realPower >= 0 ? realPower : nilmActivePower(current, 0, voltage, 0, length);
     // if no valid effCurrent pass in, we calculate it.
@@ -89,31 +94,26 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     float effU = effVoltage >= 0 ? effVoltage : nilmEffectiveValue(voltage, 0, length);
 
     insertFifoBuffOne(gActivePBuff, EFF_BUFF_NUM, activePower);
-    int isStable = nilmIsStable(gActivePBuff, EFF_BUFF_NUM, 80, 2);
+    int isStable = nilmIsStable(gActivePBuff, EFF_BUFF_NUM, 30, 2);
 
     if (isStable != gLastStable) {
         printf(">>>stable status change, stable=%d\n", isStable);
     }
     // 稳态
     if (isStable > 0) {
-        /*
-         * * 状态发生变化，核心算法部分 TODO: 1.微波炉分段启动 2.慢慢调节 3.换挡设备 4.相似设备混淆 5.不同设备误识别
-         * 6.功耗统计在识别不准的情况下混乱
-         */
-        // if (gLastStable == 0 && nilmAbs(effI - gLastStableIEff)
-        // > gStableJumpThresh) {
+
         if (gLastStable == 0
-                && nilmAbs(
+                && fabs(
                         activePower * 220 * 220 / effU / effU
                                 - gLastStableActivePower * 220 * 220 / gLastStableUEff / gLastStableUEff)
-                        > 250) {
+                        > gNilmMinEventStep) {
 
             // 计算差分电流
             int zero1 = zeroCrossPoint(gLastStableUBuff, 0, 128);
             int zero2 = zeroCrossPoint(gUBuff, 0, 128);
 
             for (int i = 0; i < 128; i++) {
-                gDeltaIBuff[i] = gIBuff[zero2++] - gLastStableIBuff[zero1++];
+                gDeltaIBuff[i] = gIBuff[zero2 + i] - gLastStableIBuff[zero1 + i];
             }
 
             // TODO:是否要加筛选机制，待验证
@@ -145,6 +145,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             nilmFeature.activePower = deltaActivePower * 220 * 220 / deltaEffU / deltaEffU;
 
             NilmEvent nilmEvent;
+            memset(&nilmEvent, 0, sizeof(nilmEvent));
             nilmEvent.eventTime = utcTime;
             nilmEvent.voltage = effU;
             nilmEvent.eventId = nilmEvent.eventTime;            // set time as id
@@ -198,11 +199,29 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 oa.possiblity = possibility;
                 oa.poweronTime = utcTime;
                 oa.voltage = effU;
+                oa.estimatedActivePower = deltaActivePower;
+                if (nilmFeature.powerFactor >= 0.97f && nilmFeature.pulseI <= 1.03f
+                        && nilmFeature.oddFft[0] / nilmFeature.oddFft[1] >= 20) {
+                    oa.category = CATEGORY_HEATING;
+                } else {
+                    oa.category = CATEGORY_UNBELIEVABLE;
+                }
                 updateOnlineList(&oa);
             }
             nilmEvent.possiblity = possibility;
             nilmEvent.applianceId = bestMatchedId;
+
             abnormalCheck(realPower);
+
+            //事件足迹更新
+            NilmEventFootprint footprint;
+            footprint.deltaPower = deltaActivePower;
+            footprint.deltaPowerFactor = deltaPowerFactor;
+            footprint.eventTime = utcTime;
+            footprint.linePower = activePower;
+            footprint.voltage = effVoltage;
+            insertFifoCommon((char*) gFootprints, sizeof(gFootprints), (char*) (&footprint),
+                    sizeof(footprint));
         }
 
         // 稳态赋值或状态刷新
@@ -232,19 +251,19 @@ static float gReorgFv2[3];
 static const double NOT_MATCH_DIS = 999;
 
 // fv1为原始特征,归一化会损失一些必要信息;fv2为特征库里归一化后的向量,减少无用的重复计算
-static double featureMatch(float fv1[], float normalizedFv2[]) {
+double featureMatch(float fv1[], float normalizedFv2[]) {
 
     // Step1: 先判断必要条件，一票否决
     if (fv1 == NULL || normalizedFv2 == NULL) {
         return NOT_MATCH_DIS;
     }
     // 基于功率快捷筛选,功率差300w或者功率比超过3倍,直接退出
-    if (abs(fv1[0] - normalizedFv2[0]) > 1.5f || fv1[0] / (normalizedFv2[0] + 0.01f) > 3.0f
+    if (fabs(fv1[0] - normalizedFv2[0]) > 1.5f || fv1[0] / (normalizedFv2[0] + 0.01f) > 3.0f
             || normalizedFv2[0] / (fv1[0] + 0.01f) < 0.33f) {
         return NOT_MATCH_DIS;
     }
     // 基波分量占比
-    if (abs(getRatioLevel(fv1) - getRatioLevel(normalizedFv2)) >= 2) {
+    if (fabs(getRatioLevel(fv1) - getRatioLevel(normalizedFv2)) >= 2) {
         return NOT_MATCH_DIS;
     }
 
@@ -268,7 +287,7 @@ static double featureMatch(float fv1[], float normalizedFv2[]) {
     return euDis;
 }
 
-static int getRatioLevel(float fv[]) {
+int getRatioLevel(float fv[]) {
     float highOddFftSum = 0.00001f;
     for (int i = 1; i < 5; i++) {
         highOddFftSum += fv[i];
@@ -284,6 +303,118 @@ static int getRatioLevel(float fv[]) {
         return 3;
     else
         return 4;
+}
+
+/*
+ * startTime: 分析的最小起始时间
+ */
+int footprintsAnalyze(const NilmEventFootprint *const footprints, int footprintSize, int startTime) {
+
+    int flipTimes = 0;       //非对称切换次数
+    int maybeSteplessChange = 0;  //判断是否有疑似无级变化
+    int timestartIndex = 0;
+    for (int i = 0; i < footprintSize; i++) {
+        NilmEventFootprint footprint = footprints[i];
+        if (footprint.eventTime < startTime) {
+            timestartIndex = i;  //记录起始处理的index
+            continue;
+        }
+
+        if (i < footprintSize - 1 && maybeSteplessChange == 0) {
+            float delta = footprints[i + 1].deltaPower;
+
+            if (delta > 0) {
+                float lineDelta = footprints[i + 1].linePower - footprints[i].linePower;
+                //delta变化量比线路总负荷变化明显小 TODO:not best
+                if (lineDelta - delta > 300 && footprints[i + 1].eventTime - footprints[i].eventTime < 180) {
+                    maybeSteplessChange = 1;
+                }
+            }
+        }
+    }
+
+    return 1;
+}
+
+/*
+ * cur/vol:电压过0点时的
+ */
+#define BATCH 4
+void stableFeatureExtract(float *cur, int curStart, int curLen, float *vol, int volStart, int volLen) {
+
+    // 窗口均值滤波
+    if (curLen % BATCH != 0)
+        return;
+    float max = -999, min = 999;
+    float c[33];  // 扩充1位
+    for (int i = 0; i < 128; i += BATCH) {
+        for (int j = 0; j < BATCH; j++) {
+            c[i / BATCH] += cur[curStart + i + j] / BATCH;
+        }
+        if (c[i / BATCH] < min)
+            min = c[i / BATCH];
+        if (c[i / BATCH] > max)
+            max = c[i / BATCH];
+    }
+    c[32] = c[0];
+    float ad = 0, delta, average = 0;
+    for (int i = 1; i < 33; i++) {
+        delta = (float) (c[i] - c[i - 1]);
+        delta = delta > 0 ? delta : -delta;
+        ad += delta;
+    }
+    ad /= 32;
+
+    for (int i = 0; i < 32; i++) {
+        average += c[i];
+    }
+    average /= 32;
+
+    int direction = 0, extremeNum = 0, flatNum = 0, flatBitmap = 0;
+    float valueThresh = 0.25f, deltaThresh = ad / 3;
+    for (int i = 0; i < 32; i++) {
+        // 周边至少一个点也是平肩
+        if ((i >= 2 && fabs(c[i]) < valueThresh && fabs(c[i - 1]) < valueThresh
+                && fabs(c[i - 2]) < valueThresh && fabs(c[i] - c[i - 2]) < deltaThresh
+                && fabs(c[i] - c[i - 1]) < deltaThresh && fabs(c[i - 1] - c[i - 2]) < deltaThresh)
+                || (i <= 30 && fabs(c[i]) < valueThresh && fabs(c[i + 1]) < valueThresh
+                        && fabs(c[i + 2]) < valueThresh && fabs(c[i + 2] - c[i]) < deltaThresh
+                        && fabs(c[i + 1] - c[i]) < deltaThresh && fabs(c[i + 2] - c[i + 1]) < deltaThresh)) {
+            flatNum++;
+            flatBitmap = flatBitmap | (0x1 << i);
+        }
+    }
+    // 极值点个数，极值点非平肩
+    for (int i = 0; i < 32; i++) {
+        if (c[i + 1] - c[i] > 0 && (flatBitmap & (0x1 << i)) == 0) {
+            if (direction < 0) {  // && fabs(c[i]) > averageDelta / 5
+                extremeNum++;
+            }
+            direction = 1;
+        } else if (c[i + 1] - c[i] < 0 && (flatBitmap & (0x1 << i)) == 0) {
+            if (direction > 0) {
+                extremeNum++;
+            }
+            direction = -1;
+        }
+    }
+    return;
+}
+
+int getNilmAlgoVersion() {
+    return VERSION[0] << 24 | VERSION[1] << 16 | VERSION[2] << 8 | VERSION[3];
+}
+
+void setNilmWorkEnv(int env) {
+    gNilmWorkEnv = env;
+}
+
+int getNilmWorkEnv() {
+    return gNilmWorkEnv;
+}
+
+void setNilmMinEventStep(int minEventStep) {
+    gNilmMinEventStep = minEventStep;
 }
 
 void nilm_algo_main() {

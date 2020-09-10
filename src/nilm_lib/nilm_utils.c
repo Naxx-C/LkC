@@ -168,12 +168,23 @@ float nilmAbs(float val) {
 // 只插入一条，最新插入的数据排在buff后面
  void insertFifoBuffOne(float buff[], int buffSize, float newData) {
 
-    buff[buffSize - 1] = newData;
     int end = buffSize - 1;
     for (int i = 0; i < end; i++) {
         buff[i] = buff[i + 1];
     }
+    buff[buffSize - 1] = newData;
 }
+
+/**
+ * demo: insertFifoCommon((char*) test23, sizeof(test23), (char*) &t1, sizeof(t1))
+ */
+void insertFifoCommon(char *buff, int buffSize, char *newData, int dataLen) {
+
+     if (buffSize % dataLen != 0 || dataLen > buffSize)
+         return;
+     memcpy(buff, buff + dataLen, buffSize - dataLen);
+     memcpy(buff + buffSize - dataLen, newData, dataLen);
+ }
 
 /**
  * 欧式距离相似度
