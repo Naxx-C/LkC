@@ -10,7 +10,7 @@ typedef struct {
 
     signed char id;
     signed char category; //大类
-    signed char isWaitingForCheck; //是否待确定
+    signed char isConfirmed; //是否待确定
     float activePower;//实际差分有功
     float voltage;
     float possiblity;
@@ -34,10 +34,11 @@ void addToMatchedList(MatchedAppliance *new);
 void clearMatchedList();
 
 void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId,float* possibility);
+void getMatchedList(MatchedAppliance *matchedList, int *matchedListCounter);
 
-void updateOnlineList(OnlineAppliance *new);
+void updateOnlineListByEvent(OnlineAppliance *new);
 void updatePowercost(int utcTime, float *totalPowerCost, float lastUpdatedActivePower);
-void abnormalCheck(float totalPower);
+void powerCheck(float totalPower);
 
 //gMatchedList为临时数组,使用前恢复
 void clearOnlineList();

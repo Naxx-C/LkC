@@ -10,8 +10,7 @@
 #include "nilm_onlinelist.h"
 
 #define PI 3.14159265f
-#define HOUR 3600
-#define DAY (3600*24)
+#define MIN_POSSIBILITY 80//最小接受概率
 const static char VERSION[] = { 1, 0, 0, 0 };
 
 #define EFF_BUFF_NUM (50 * 3) // effective current buffer NUM
@@ -35,10 +34,12 @@ static float gTransitTmpIMax = 0;
 static float gOddFft[5]; // 13579次谐波
 static int gTimer = 0;
 static float gTotalPowerCost = 0; //kws
+static float gLastActivePower = 0; //上个周期线路有功功率
 
-static float gLastStableActivePower = 0;
+static float gLastStableActivePower = 0; //稳态窗口下最近的有功功率,对于缓慢变化的场景会跟随变化
+static float gLastProcessedStableActivePower = 0; //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
 
-#define NILMEVENT_MAX_NUM   100 // 最多储存的事件
+#define NILMEVENT_MAX_NUM   50 // 最多储存的事件
 static NilmEvent gNilmEvents[NILMEVENT_MAX_NUM];
 #define FOOTPRINT_SIZE 100
 static NilmEventFootprint gFootprints[FOOTPRINT_SIZE]; //存储事件足迹
@@ -86,7 +87,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     insertFifoBuff(gUBuff, BUFF_NUM, voltage, length);
 
     //首先更新功耗数据
-    updatePowercost(utcTime, &gTotalPowerCost, gActivePBuff[EFF_BUFF_NUM - 1]);
+    updatePowercost(utcTime, &gTotalPowerCost, gLastActivePower);
     // 当前有功功率
     float activePower = realPower >= 0 ? realPower : nilmActivePower(current, 0, voltage, 0, length);
     // if no valid effCurrent pass in, we calculate it.
@@ -102,6 +103,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     // 稳态
     if (isStable > 0) {
 
+        //投切事件发生
         if (gLastStable == 0
                 && fabs(
                         activePower * 220 * 220 / effU / effU
@@ -148,7 +150,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             memset(&nilmEvent, 0, sizeof(nilmEvent));
             nilmEvent.eventTime = utcTime;
             nilmEvent.voltage = effU;
-            nilmEvent.eventId = nilmEvent.eventTime;            // set time as id
+            nilmEvent.eventId = nilmEvent.eventTime;    // set time as id
             nilmEvent.activePower = activePower;
             nilmEvent.action = deltaActivePower > 0 ? ACTION_ON : ACTION_OFF;
 
@@ -177,7 +179,8 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         euDis = 3;            //to avoid useless exp cal cost
                     double possibility = 100 / pow(5, euDis);
 
-                    if (possibility > 70) {
+                    if (possibility > MIN_POSSIBILITY) {
+                        //加入进匹配成功的临时列表
                         MatchedAppliance ma;
                         ma.activePower = deltaActivePower;
                         ma.id = appliance.id;
@@ -206,12 +209,39 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 } else {
                     oa.category = CATEGORY_UNBELIEVABLE;
                 }
-                updateOnlineList(&oa);
+
+                setInitWaitingCheckStatus(&oa);
+
+                updateOnlineListByEvent(&oa);
+
+
+                //事件延时确认机制
+                {
+                    MatchedAppliance *matchedList = NULL;
+                    int matchedListCounter = 0;
+                    getMatchedList(matchedList, &matchedListCounter);
+                    if (matchedList != NULL && matchedListCounter > 0) {
+                        for (int i = 0; i < matchedListCounter; i++) {
+                            MatchedAppliance *m = &(matchedList[i]);
+                            nilmEvent.possibleIds[i] = m->id;
+                            //TODO:根据不同电器定义时间
+                            //  ApplianceAdditionalInfo *info = getApplianceAdditionalInfo(m->id);
+                            //  if (info != NULL) {
+                            //      nilmEvent.countdownTimer[i] = info->minUseTime + utcTime;
+                            //  }
+                            if (oa.category == CATEGORY_HEATING) {
+                                nilmEvent.countdownTimer[i] = 10 * 60;
+                            } else {
+                                nilmEvent.countdownTimer[i] = 3 * 60;
+                            }
+                        }
+                    }
+                }
             }
             nilmEvent.possiblity = possibility;
             nilmEvent.applianceId = bestMatchedId;
 
-            abnormalCheck(realPower);
+            powerCheck(activePower);
 
             //事件足迹更新
             NilmEventFootprint footprint;
@@ -222,9 +252,13 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             footprint.voltage = effVoltage;
             insertFifoCommon((char*) gFootprints, sizeof(gFootprints), (char*) (&footprint),
                     sizeof(footprint));
-        }
 
-        // 稳态赋值或状态刷新
+            gLastProcessedStableActivePower = activePower;
+        } //投切事件处理
+
+        //缓慢变频
+
+        // 稳态窗口的变量赋值和状态刷新
         for (int i = 0; i < BUFF_NUM; i++) {
             gLastStableIBuff[i] = gIBuff[i];
             gLastStableUBuff[i] = gUBuff[i];
@@ -234,7 +268,6 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
         gLastStableActivePower = activePower;
         gTransitTime = 0;
         gTransitTmpIMax = 0;
-
     } else {                // 非稳态
         gTransitTime++;
         if (effI > gTransitTmpIMax) {
@@ -242,6 +275,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
         }
     }
     gLastStable = isStable;
+    gLastActivePower = activePower;
 
     return 0;
 }
@@ -399,6 +433,15 @@ void stableFeatureExtract(float *cur, int curStart, int curLen, float *vol, int 
         }
     }
     return;
+}
+
+//TODO:need a smarter way later
+void setInitWaitingCheckStatus(OnlineAppliance *oa) {
+
+    oa->isConfirmed = 0;
+    if (oa->id == APPID_MICROWAVE_OVEN || oa->id == APPID_CLEANER) {
+        oa->isConfirmed = 1;
+    }
 }
 
 int getNilmAlgoVersion() {

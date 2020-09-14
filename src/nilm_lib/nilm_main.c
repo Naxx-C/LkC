@@ -7,4 +7,3 @@
 #include <time.h>
 #include <unistd.h>
 #include "nilm_algo.h"
-

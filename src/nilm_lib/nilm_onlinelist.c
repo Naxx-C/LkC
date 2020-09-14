@@ -46,6 +46,11 @@ void addToMatchedList(MatchedAppliance *new) {
     }
 }
 
+void getMatchedList(MatchedAppliance *matchedList, int *matchedListCounter) {
+    matchedList = gMatchedList;
+    *matchedListCounter = gMatchedListCounter;
+}
+
 void fillInWaitingCheckInfos(signed char *possibleIds, int *countdownTimer, int size, int utcTime) {
 
     int num = size < gMatchedListCounter ? size : gMatchedListCounter;
@@ -112,10 +117,10 @@ void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId, float
 }
 
 /**
- *  new: 新事件
+ *  new: 通过新事件触发
  */
-void updateOnlineList(OnlineAppliance *new) {
-    if (new->id < 0)
+void updateOnlineListByEvent(OnlineAppliance *new) {
+    if (new->id <= NULL_APP_ID)
         return;
 
     if (isOnline(new->id)) {
@@ -150,6 +155,36 @@ void updateOnlineList(OnlineAppliance *new) {
         }
     }
 
+}
+
+/**
+ *  new: 直接修改在线电器
+ */
+void updateOnlineListDirectly(OnlineAppliance *new) {
+    if (new->id <= NULL_APP_ID || new->activePower < 0)
+        return;
+
+    if (isOnline(new->id)) {
+        for (int i = 0; i < gOnlineListCounter; i++) {
+            OnlineAppliance *o = &(gOnlineList[i]);
+            if (o->id == new->id) {
+                memcpy(o, new, sizeof(OnlineAppliance));
+            }
+        }
+    } else {
+
+        //list已满,移除最老的1个
+        if (gOnlineListCounter >= ONLINELIST_MAX_NUM) {
+            for (int i = 0; i < gOnlineListCounter - 1; i++) {
+                memcpy(gOnlineList + i, gOnlineList + i + 1, sizeof(OnlineAppliance));
+            }
+            memcpy(gOnlineList + gOnlineListCounter - 1, new, sizeof(OnlineAppliance));
+        } else { //直接插入到list尾
+            memcpy(gOnlineList + gOnlineListCounter, new, sizeof(OnlineAppliance));
+            if (gOnlineListCounter < ONLINELIST_MAX_NUM)
+                gOnlineListCounter++;
+        }
+    }
 }
 
 /**
@@ -207,10 +242,10 @@ void removeFromOnlineList(signed char id) {
     }
 }
 
-void getOnlineList(OnlineAppliance *onlineList, int *size) {
+void getOnlineList(OnlineAppliance *onlineList, int *onlineListCounter) {
 
     onlineList = gOnlineList;
-    *size = gOnlineListCounter;
+    *onlineListCounter = gOnlineListCounter;
 }
 
 //计算已识别电器的功率总和
@@ -225,7 +260,7 @@ float getOnlineListPower() {
 }
 
 //异常处理
-void abnormalCheck(float totalPower) {
+void powerCheck(float totalPower) {
 
     if (totalPower > 0) {
         float listPower = 0;
@@ -253,7 +288,7 @@ void updateOnlineAppPower(float voltage) {
 
     for (int i = 0; i < gOnlineListCounter; i++) {
         OnlineAppliance *o = &(gOnlineList[i]);
-        if (o->id < 0)
+        if (o->id <= NULL_APP_ID)
             continue;
         o->activePower = voltage * voltage / o->voltage / o->voltage * o->activePower;
         o->voltage = voltage;

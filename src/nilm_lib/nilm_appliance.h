@@ -33,5 +33,13 @@ typedef struct {
 #define  ENV_OFFICE (0x1 << 2)    //办公室环境
 #define ENV_SIMPLE_TEST (0x1 << 3) //简易/临时搭建的测试环境
 
+#define APPID_FIXFREQ_AIRCONDITIONER 0x01
+#define APPID_VARFREQ_AIRCONDITIONER 0x02
+#define APPID_MICROWAVE_OVEN 0x07
+#define APPID_ROLLER_WASHER 0x08
+#define APPID_TURBO_WASHER 0x09
+#define APPID_HAIRDRYER 0x0E
+#define APPID_CLEANER 0x12
+
 void addNormalizedFeature(NilmAppliance *na, float fv[]);
 #endif

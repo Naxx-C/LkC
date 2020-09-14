@@ -153,11 +153,11 @@ int main() {
     o5.poweronTime = 100086;
     o5.voltage = 200;
 
-    updateOnlineList(&o1);
-    updateOnlineList(&o2);
-    updateOnlineList(&o3);
-    updateOnlineList(&o4);
-    updateOnlineList(&o5);
+    updateOnlineListByEvent(&o1);
+    updateOnlineListByEvent(&o2);
+    updateOnlineListByEvent(&o3);
+    updateOnlineListByEvent(&o4);
+    updateOnlineListByEvent(&o5);
 
     /***
      * 识别流程开始
@@ -204,8 +204,8 @@ int main() {
     o.poweronTime = 123405;
     o.voltage = 210;
 
-    updateOnlineList(&o);
-    abnormalCheck(100.0f);
+    updateOnlineListByEvent(&o);
+    powerCheck(100.0f);
 
     printf("end\n");
     return 0;

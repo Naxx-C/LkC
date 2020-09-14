@@ -32,6 +32,7 @@ void addNormalizedFeature(NilmAppliance *na, float fv[]) {
 //}
 #define APPLIANCE_ADD_INFO_SIZE 30
 ApplianceAdditionalInfo gApplianceAdditionalInfos[APPLIANCE_ADD_INFO_SIZE];
+//TODO:待补充
 void nilmApplianceInit() {
 
     memset(gApplianceAdditionalInfos, 0, sizeof(gApplianceAdditionalInfos));
@@ -59,4 +60,5 @@ ApplianceAdditionalInfo* getApplianceAdditionalInfo(signed char id) {
     }
     return NULL;
 }
+
 

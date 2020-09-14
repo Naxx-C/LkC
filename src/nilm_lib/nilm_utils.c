@@ -77,6 +77,7 @@
             return 0;
         }
     }
+
     return 1;
 }
 
@@ -177,6 +178,8 @@ float nilmAbs(float val) {
 
 /**
  * demo: insertFifoCommon((char*) test23, sizeof(test23), (char*) &t1, sizeof(t1))
+ * 始终插入到最后一个位置;需要数据本身支持可以判断有效性
+ * buffSize: 队列占用的字节大小，注意不是队列长度
  */
 void insertFifoCommon(char *buff, int buffSize, char *newData, int dataLen) {
 

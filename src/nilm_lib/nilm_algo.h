@@ -44,6 +44,7 @@ int getNilmAlgoVersion();
 void setNilmWorkEnv(int env);
 int getNilmWorkEnv();
 void setNilmMinEventStep(int minEventStep);
+void setInitWaitingCheckStatus(OnlineAppliance *oa);
 
 #define ACTION_NONE  0
 #define ACTION_ON  1
