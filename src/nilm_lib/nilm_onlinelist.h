@@ -17,6 +17,7 @@ typedef struct {
     int poweronTime;
     int eventId; //对应事件的id
     float estimatedActivePower; //综合判断的估计电量,对比变频设备一般会大于实际差分有功
+    float runningMaxActivePower; //自动赋值,不需要手动赋值
     float powerCost; //kws，需/3600转为kwh
 } OnlineAppliance;
 
@@ -44,6 +45,7 @@ void powerCheck(float totalPower);
 void clearOnlineList();
 void removeFromOnlineList(signed char id);
 char isOnline(signed char id);
+char isOnlineByEventId(int eventId);
 
 void getOnlineList(OnlineAppliance *onlineList, int *size);
 float getOnlineListPower();

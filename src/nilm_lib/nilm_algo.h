@@ -6,7 +6,6 @@
 typedef struct {
 
     int eventId;
-    signed char action;
     signed char applianceId;
     float activePower; // powerline's realtime active power
     float voltage;
@@ -14,7 +13,7 @@ typedef struct {
     int eventTime;
     float feature[8]; // as nilm feature
     signed char possibleIds[MATCHEDLIST_MAX_NUM];//候选待确认id
-    int countdownTimer[MATCHEDLIST_MAX_NUM]; //待确认倒计时
+    int delayedTimer[MATCHEDLIST_MAX_NUM]; //待确认倒计时
 } NilmEvent;
 
 typedef struct {
@@ -25,6 +24,10 @@ typedef struct {
     float voltage;
     int eventTime; // in second
 } __attribute__ ((packed)) NilmEventFootprint;
+
+typedef struct {
+    int flipTimes;
+} FootprintResult;
 
 //typedef struct {
 //
@@ -45,6 +48,7 @@ void setNilmWorkEnv(int env);
 int getNilmWorkEnv();
 void setNilmMinEventStep(int minEventStep);
 void setInitWaitingCheckStatus(OnlineAppliance *oa);
+void checkWaitingNilmEvents(int currentTime);
 
 #define ACTION_NONE  0
 #define ACTION_ON  1

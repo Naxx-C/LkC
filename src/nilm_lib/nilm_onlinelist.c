@@ -129,6 +129,10 @@ void updateOnlineListByEvent(OnlineAppliance *new) {
             if (o->id == new->id) {
                 float previousPower = o->activePower;
                 o->activePower += new->activePower;
+                if (o->activePower > o->runningMaxActivePower) {
+                    o->runningMaxActivePower = o->activePower;
+                }
+
                 if (o->activePower < 80 || o->activePower < previousPower * 0.1) {
                     //小功率移除
                     removeFromOnlineList(o->id);
@@ -142,6 +146,7 @@ void updateOnlineListByEvent(OnlineAppliance *new) {
             return;
         }
 
+        new->runningMaxActivePower = new->activePower;
         //list已满,移除最老的1个
         if (gOnlineListCounter >= ONLINELIST_MAX_NUM) {
             for (int i = 0; i < gOnlineListCounter - 1; i++) {
@@ -154,7 +159,6 @@ void updateOnlineListByEvent(OnlineAppliance *new) {
                 gOnlineListCounter++;
         }
     }
-
 }
 
 /**
@@ -168,11 +172,14 @@ void updateOnlineListDirectly(OnlineAppliance *new) {
         for (int i = 0; i < gOnlineListCounter; i++) {
             OnlineAppliance *o = &(gOnlineList[i]);
             if (o->id == new->id) {
+                new->runningMaxActivePower =
+                        new->runningMaxActivePower > o->activePower ?
+                                new->runningMaxActivePower : o->activePower;
                 memcpy(o, new, sizeof(OnlineAppliance));
             }
         }
     } else {
-
+        new->runningMaxActivePower = new->activePower;
         //list已满,移除最老的1个
         if (gOnlineListCounter >= ONLINELIST_MAX_NUM) {
             for (int i = 0; i < gOnlineListCounter - 1; i++) {
@@ -211,12 +218,17 @@ void updatePowercost(int utcTime, float *totalPowerCost, float lastUpdatedActive
 
 //清空在线列表
 void clearOnlineList() {
+
+    for (int i = 0; i < gOnlineListCounter; i++) {
+        OnlineAppliance *o = &(gOnlineList[i]);
+        handleApplianceOff(o);
+    }
     gOnlineListCounter = 0;
 }
 
 char isOnline(signed char id) {
 
-    if (id < 0) {
+    if (id <= NULL_APP_ID) {
         return 0;
     }
     for (int i = 0; i < gOnlineListCounter; i++) {
@@ -227,11 +239,26 @@ char isOnline(signed char id) {
     return 0;
 }
 
+char isOnlineByEventId(int eventId) {
+
+    if (eventId <= 0) {
+        return 0;
+    }
+    for (int i = 0; i < gOnlineListCounter; i++) {
+        OnlineAppliance *o = &(gOnlineList[i]);
+        if (o->eventId == eventId)
+            return 1;
+    }
+    return 0;
+}
+
+extern void handleApplianceOff(OnlineAppliance *oa);
 void removeFromOnlineList(signed char id) {
 
     for (int i = 0; i < gOnlineListCounter; i++) {
         OnlineAppliance *o = &(gOnlineList[i]);
         if (o->id == id) {
+            handleApplianceOff(o);
             //list后续元素前移
             for (int j = i; j < gOnlineListCounter - 1; j++) {
                 memcpy(gOnlineList + j, gOnlineList + j + 1, sizeof(OnlineAppliance));
