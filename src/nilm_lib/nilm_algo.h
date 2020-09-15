@@ -12,7 +12,7 @@ typedef struct {
     float possiblity;
     int eventTime;
     float feature[8]; // as nilm feature
-    signed char possibleIds[MATCHEDLIST_MAX_NUM];//候选待确认id
+    signed char possibleIds[MATCHEDLIST_MAX_NUM]; //候选待确认id
     int delayedTimer[MATCHEDLIST_MAX_NUM]; //待确认倒计时
 } NilmEvent;
 
@@ -28,12 +28,13 @@ typedef struct {
 typedef struct {
     int flipTimes;
     char haveNonPureResLoad; //是否有非纯阻性事件发生
+    char haveSteplessChange; //出现缓慢变化
 } FootprintResult;
 
 typedef struct {
-    int flatNum;//平肩数目
+    int flatNum; //平肩数目
     int extremeNum; //极值点数目
-    float activePower;//有功功率
+    float activePower; //有功功率
     float reactivePower; //无功功率
 } StableFeature;
 //typedef struct {
@@ -56,6 +57,9 @@ int getNilmWorkEnv();
 void setNilmMinEventStep(int minEventStep);
 void setInitWaitingCheckStatus(OnlineAppliance *oa);
 void checkWaitingNilmEvents(int currentTime);
+void updateOnlineAppPower(signed char id, float activePower);
+char nilmGetStableFeature(float *cur, int curStart, int curLen, float *vol, int volStart, int volLen,
+        float effI, float effU, float activePower, StableFeature *sf);
 
 #define ACTION_NONE  0
 #define ACTION_ON  1

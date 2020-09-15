@@ -51,6 +51,7 @@ char isOnlineByEventId(int eventId);
 
 void getOnlineList(OnlineAppliance *onlineList, int *size);
 float getOnlineListPower();
-void updateOnlineAppPower(float voltage);
+void updateOnlineListPowerByVol(float voltage);
+void adjustAirConditionerPower(float totalPower);
 
 #endif

@@ -39,17 +39,26 @@ void nilmApplianceInit() {
     //定频空调
     gApplianceAdditionalInfos[0].id = 0x01;
     gApplianceAdditionalInfos[0].supportedEnv = ENV_HOME;
-    gApplianceAdditionalInfos[0].minPower = 600;
-    gApplianceAdditionalInfos[0].maxPower = 1600;
     gApplianceAdditionalInfos[0].maybeModeChange = 0;
 
     //吹风机
     gApplianceAdditionalInfos[1].id = 0x0E;
     gApplianceAdditionalInfos[1].supportedEnv = ENV_FULL;
-    gApplianceAdditionalInfos[1].minPower = 500;
-    gApplianceAdditionalInfos[1].maxPower = 2300;
+    gApplianceAdditionalInfos[1].minUseTime = 0;
+    gApplianceAdditionalInfos[1].maxUseTime = 10 * 60;
     gApplianceAdditionalInfos[1].maybeModeChange = 1;
-
+    //热水壶
+    gApplianceAdditionalInfos[1].id = 0x04;
+    gApplianceAdditionalInfos[1].supportedEnv = ENV_FULL;
+    gApplianceAdditionalInfos[1].minUseTime = 3 * 60;
+    gApplianceAdditionalInfos[1].maxUseTime = 10 * 60;
+    gApplianceAdditionalInfos[1].maybeModeChange = 1;
+    //饮水机
+    gApplianceAdditionalInfos[1].id = 0x10;
+    gApplianceAdditionalInfos[1].supportedEnv = ENV_FULL;
+    gApplianceAdditionalInfos[1].minUseTime = 2 * 60;
+    gApplianceAdditionalInfos[1].maxUseTime = 10 * 60;
+    gApplianceAdditionalInfos[1].maybeModeChange = 1;
 }
 
 ApplianceAdditionalInfo* getApplianceAdditionalInfo(signed char id) {
