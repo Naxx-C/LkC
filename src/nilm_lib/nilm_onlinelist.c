@@ -11,6 +11,9 @@ static OnlineAppliance gOnlineList[ONLINELIST_MAX_NUM];
 static MatchedAppliance gMatchedList[MATCHEDLIST_MAX_NUM];
 static int gMatchedListCounter = 0;
 static int gMatchedListWriteIndex = 0;
+
+extern void handleApplianceOff(OnlineAppliance *oa);
+
 void addToMatchedList(MatchedAppliance *new) {
 
     if (gMatchedListWriteIndex >= MATCHEDLIST_MAX_NUM)
@@ -51,24 +54,21 @@ void getMatchedList(MatchedAppliance *matchedList, int *matchedListCounter) {
     *matchedListCounter = gMatchedListCounter;
 }
 
-void fillInWaitingCheckInfos(signed char *possibleIds, int *countdownTimer, int size, int utcTime) {
-
-    int num = size < gMatchedListCounter ? size : gMatchedListCounter;
-
-    for (int i = 0; i < num; i++) {
-        MatchedAppliance *m = &(gMatchedList[i]);
-        possibleIds[i] = m->id;
-        ApplianceAdditionalInfo *info = getApplianceAdditionalInfo(m->id);
-        if (info != NULL) {
-            countdownTimer[i] = info->minUseTime;
-        }
-    }
-}
-
 //gMatchedList为临时数组,使用前恢复
 void clearMatchedList() {
     gMatchedListCounter = 0;
     gMatchedListWriteIndex = 0;
+}
+
+char isInMatchedList(signed char id) {
+
+    for (int i = 0; i < gMatchedListCounter; i++) {
+        MatchedAppliance *m = &(gMatchedList[i]);
+        if (id==m->id) {
+           return 1;
+        }
+    }
+    return 0;
 }
 
 void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId, float *possibility) {
@@ -196,7 +196,6 @@ void updateOnlineListDirectly(OnlineAppliance *new) {
 
 /**
  *  更新在线列表里的功耗
- *  TODO: 时间是否会存在不稳定或跳变？
  *  totalPowerCost: 时间段内总功耗，单位kws
  *  lastUpdatedActivePower: 上一次更新功耗时的线路总的有功功率
  */
@@ -252,7 +251,6 @@ char isOnlineByEventId(int eventId) {
     return 0;
 }
 
-extern void handleApplianceOff(OnlineAppliance *oa);
 void removeFromOnlineList(signed char id) {
 
     for (int i = 0; i < gOnlineListCounter; i++) {

@@ -52,6 +52,22 @@
 }
 
 /**
+ * 通过功率因数计算无功功率
+ */
+float nilmGetReactivePowerByPf(float activePower, float powerFactor) {
+
+    float reactivePower = sqrtf(
+            activePower * activePower / powerFactor / powerFactor - activePower * activePower);
+    return reactivePower;
+}
+//通过视在功率计算无功功率
+ float nilmGetReactivePowerByS(float activePower, float apparentPower) {
+
+    float reactivePower = sqrtf(apparentPower * apparentPower - activePower * activePower);
+    return reactivePower;
+}
+
+/**
  *
  * @param inputs
  * @param len

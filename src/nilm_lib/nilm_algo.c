@@ -32,7 +32,7 @@ static int gStartupTime = 0; // 启动时间
 static float gIPulse = 0; // 脉冲电流比
 static float gTransitTmpIMax = 0;
 static float gOddFft[5]; // 13579次谐波
-static int gTimer = 0;
+static int gUtcTime = 0;
 static float gTotalPowerCost = 0; //kws
 static float gLastActivePower = 0; //上个周期线路有功功率
 
@@ -77,7 +77,7 @@ NilmAppliance* createNilmAppliance(char name[], int nameLen, char id, float accu
 int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float effCurrent, float effVoltage,
         float realPower, float oddFft[]) {
     // global timer
-    gTimer++;
+    gUtcTime = utcTime;
 
     if (length > BUFF_NUM || BUFF_NUM % length != 0) {
         return -2;
@@ -93,6 +93,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     // if no valid effCurrent pass in, we calculate it.
     float effI = effCurrent >= 0 ? effCurrent : nilmEffectiveValue(current, 0, length);
     float effU = effVoltage >= 0 ? effVoltage : nilmEffectiveValue(voltage, 0, length);
+    float powerFactor = activePower / (effI * effU + 0.00001f);
 
     insertFifoBuffOne(gActivePBuff, EFF_BUFF_NUM, activePower);
     int isStable = nilmIsStable(gActivePBuff, EFF_BUFF_NUM, 30, 2);
@@ -159,6 +160,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             nilmEvent.feature[7] = nilmFeature.activePower;
 
             clearMatchedList(); //先清除特征匹配列表
+
             for (int i = 0; i < gAppliancesCounter; i++) {
                 NilmAppliance appliance = gNilmAppliances[i];
                 for (int j = 0; j < appliance.featureCounter; j++) {
@@ -185,6 +187,20 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         addToMatchedList(&ma);
                     }
                 }
+            }
+
+            //TODO:空调判断,临时方案
+            if (powerFactor < !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)
+                    && !isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)) {
+                MatchedAppliance ma;
+                ma.activePower = deltaActivePower;
+                ma.possiblity = 0.899;
+                if (nilmFeature.pulseI >= 2.5f) {
+                    ma.id = APPID_FIXFREQ_AIRCONDITIONER;
+                } else {
+                    ma.id = APPID_VARFREQ_AIRCONDITIONER;
+                }
+                addToMatchedList(&ma);
             }
 
             signed char bestMatchedId = -1;
@@ -239,8 +255,6 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         sizeof(nilmEvent));
             }
 
-            powerCheck(activePower);
-
             //事件足迹更新
             NilmEventFootprint footprint;
             footprint.deltaPower = deltaActivePower;
@@ -253,13 +267,14 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
 
             gLastProcessedStableActivePower = activePower;
         } else { //非投切事件处理
-            checkWaitingNilmEvents(utcTime);
+//            checkWaitingNilmEvents(utcTime);
         }
-
-        //TODO:缓慢变频
-        {
-
-        }
+//
+//        //缓慢变频判断  TODO:目前直接判断变频空调接入，待优化
+//        if (activePower - gLastProcessedStableActivePower > 100) {
+//
+//        }
+        powerCheck(activePower);
 
         // 稳态窗口的变量赋值和状态刷新
         for (int i = 0; i < BUFF_NUM; i++) {
@@ -348,7 +363,7 @@ int getRatioLevel(float fv[]) {
  *
  */
 void footprintsAnalyze(const NilmEventFootprint *const footprints, int footprintSize, int startTime,
-        FootprintResult *footprintResult) {
+        float minDeltaPower, FootprintResult *footprintResult) {
 
     int flipTimes = 0; //非对称切换次数
     int maybeSteplessChange = 0; //判断是否有疑似无级变化
@@ -380,21 +395,66 @@ void footprintsAnalyze(const NilmEventFootprint *const footprints, int footprint
     footprintResult->flipTimes = flipTimes;
 }
 
-//处理电器关闭事件
 void handleApplianceOff(OnlineAppliance *oa) {
+    if (oa->isConfirmed == 0) {
+
+        int runningTime = gUtcTime - oa->poweronTime;
+        for (int i = 0; i < NILMEVENT_MAX_NUM; i++) {
+            NilmEvent *ne = &(gNilmEvents[i]);
+
+            if (ne->eventId == oa->eventId) {
+                //先确定best id
+                ApplianceAdditionalInfo *appInfo = getApplianceAdditionalInfo(ne->applianceId);
+                if (appInfo == NULL //为空默认为无限制,判定为pass
+                        || (appInfo != NULL && runningTime >= appInfo->minUseTime
+                                && runningTime <= appInfo->maxUseTime)) {
+                    oa->isConfirmed = 1;
+                    break;
+                }
+
+                //best id未能确定，check候选id
+                for (int j = 0; j < MATCHEDLIST_MAX_NUM; j++) {
+                    if (ne->possibleIds[j] > 0) {
+                        appInfo = getApplianceAdditionalInfo(ne->possibleIds[j]);
+                        //此处简化，只选第1个
+                        if (ne->possibleIds[j] != ne->applianceId) {
+                            if (appInfo == NULL
+                                    || (appInfo != NULL && runningTime >= appInfo->minUseTime
+                                            && runningTime <= appInfo->maxUseTime)) {
+                                oa->id = ne->possibleIds[j];
+                                oa->isConfirmed = 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                break;
+            }
+        }
+    }
+
+    if (oa->isConfirmed == 0 || oa->category != CATEGORY_HEATING) {
+        oa->category = CATEGORY_UNKNOWN;
+    }
+
     //TODO:发送功耗数据
     printf("id=%d powercost=%.2f\n", oa->id, oa->powerCost);
+
 }
 
 /*
  * cur/vol:电压过0点时的
  */
 #define BATCH 4
-void stableFeatureExtract(float *cur, int curStart, int curLen, float *vol, int volStart, int volLen) {
+char nilmGetStableFeature(float *cur, int curStart, int curLen, float *vol, int volStart, int volLen,
+        float effI, float effU, float activePower, StableFeature *sf) {
 
-    // 窗口均值滤波
+    if (sf == NULL)
+        return -1;
+// 窗口均值滤波
     if (curLen % BATCH != 0)
-        return;
+        return -1;
     float max = -999, min = 999;
     float c[33]; // 扩充1位
     for (int i = 0; i < 128; i += BATCH) {
@@ -434,7 +494,7 @@ void stableFeatureExtract(float *cur, int curStart, int curLen, float *vol, int 
             flatBitmap = flatBitmap | (0x1 << i);
         }
     }
-    // 极值点个数，极值点非平肩
+// 极值点个数，极值点非平肩
     for (int i = 0; i < 32; i++) {
         if (c[i + 1] - c[i] > 0 && (flatBitmap & (0x1 << i)) == 0) {
             if (direction < 0) { // && fabs(c[i]) > averageDelta / 5
@@ -448,7 +508,17 @@ void stableFeatureExtract(float *cur, int curStart, int curLen, float *vol, int 
             direction = -1;
         }
     }
-    return;
+
+    activePower = activePower >= 0 ? activePower : nilmActivePower(current, curStart, voltage, volStart, 128);
+    effI = effI >= 0 ? effI : nilmEffectiveValue(current, curStart, 128);
+    effU = effU >= 0 ? effU : nilmEffectiveValue(voltage, volStart, 128);
+    float reactivePower = nilmGetReactivePowerByS(activePower, effI * effU);
+
+    sf->activePower = activePower;
+    sf->reactivePower = reactivePower;
+    sf->extremeNum = extremeNum;
+    sf->flatNum = flatNum;
+    return 0;
 }
 
 //TODO:need a smarter way later
@@ -485,7 +555,7 @@ void checkWaitingNilmEvents(int currentTime) {
                         if (ne->delayedTimer[j] >= currentTime) {
                             if (currentTime >= ne->delayedTimer[j]) {
                                 FootprintResult fr;
-                                footprintsAnalyze(gFootprints, FOOTPRINT_SIZE, ne->eventTime, &fr);
+                                footprintsAnalyze(gFootprints, FOOTPRINT_SIZE, ne->eventTime, 0, &fr);
                             }
                             ne->delayedTimer[j] = 0; //delayedTimer复位
                         } else {

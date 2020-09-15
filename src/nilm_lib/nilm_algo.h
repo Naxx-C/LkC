@@ -27,8 +27,15 @@ typedef struct {
 
 typedef struct {
     int flipTimes;
+    char haveNonPureResLoad; //是否有非纯阻性事件发生
 } FootprintResult;
 
+typedef struct {
+    int flatNum;//平肩数目
+    int extremeNum; //极值点数目
+    float activePower;//有功功率
+    float reactivePower; //无功功率
+} StableFeature;
 //typedef struct {
 //
 //    float deltaPower; // delta active power

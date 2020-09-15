@@ -18,6 +18,7 @@ typedef struct {
     int eventId; //对应事件的id
     float estimatedActivePower; //综合判断的估计电量,对比变频设备一般会大于实际差分有功
     float runningMaxActivePower; //自动赋值,不需要手动赋值
+    float totalPowerCostAudit; //启动时刻的当前线路总功耗记录
     float powerCost; //kws，需/3600转为kwh
 } OnlineAppliance;
 
@@ -36,6 +37,7 @@ void clearMatchedList();
 
 void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId,float* possibility);
 void getMatchedList(MatchedAppliance *matchedList, int *matchedListCounter);
+char isInMatchedList(signed char id);
 
 void updateOnlineListByEvent(OnlineAppliance *new);
 void updatePowercost(int utcTime, float *totalPowerCost, float lastUpdatedActivePower);

@@ -17,6 +17,9 @@ float nilmEffectiveValue(float inputs[], int start, int len);
  */
 float nilmActivePower(float current[], int indexI, float voltage[], int indexU, int len);
 
+float nilmGetReactivePowerByPf(float activePower, float powerFactor);
+float nilmGetReactivePowerByS(float activePower, float apparentPower);
+
 /**
  *
  * @param inputs

@@ -55,10 +55,9 @@ void nilmApplianceInit() {
 ApplianceAdditionalInfo* getApplianceAdditionalInfo(signed char id) {
 
     for (int i = 0; i < APPLIANCE_ADD_INFO_SIZE; i++) {
-        if(id==gApplianceAdditionalInfos[i].id)
+        if (id == gApplianceAdditionalInfos[i].id)
             return &(gApplianceAdditionalInfos[i]);
     }
     return NULL;
 }
-
 

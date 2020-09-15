@@ -43,4 +43,6 @@ typedef struct {
 #define APPID_CLEANER 0x12
 
 void addNormalizedFeature(NilmAppliance *na, float fv[]);
+ApplianceAdditionalInfo* getApplianceAdditionalInfo(signed char id);
+
 #endif
