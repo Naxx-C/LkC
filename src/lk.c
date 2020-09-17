@@ -27,10 +27,15 @@ void f(TestB *testB) {
     testA->a = 11;
 }
 
-float RadiantCooker[8] = { 3.62, 0.06, 0.18, 0.07, 0.08, 0.99, 1.05, 1129.82 };
-float Cleaner[8] = { 3.05, 0.35, 0.12, 0.05, 0.08, 0.99, 6.22, 983.61 };
-float Microwave[8] = { 3.08, 0.97, 0.29, 0.11, 0.06, 0.87, 1.27, 933.31 };
-float Microwave2[8] = { 1.85, 1.00, 0.35, 0.04, 0.05, 0.31, 3.05, 202.64 };
+//float RadiantCooker[8] = { 3.62, 0.06, 0.18, 0.07, 0.08, 0.99, 1.05, 1129.82 };
+//float Cleaner[8] = { 3.05, 0.35, 0.12, 0.05, 0.08, 0.99, 6.22, 983.61 };
+//float Microwave[8] = { 3.08, 0.97, 0.29, 0.11, 0.06, 0.87, 1.27, 933.31 };
+//float Microwave2[8] = { 1.85, 1.00, 0.35, 0.04, 0.05, 0.31, 3.05, 202.64 };
+
+float Cleaner1[8] = { 3.400, 2.600, 1.400, 0.700, 0.500, 0.550, 4.300, 382.300};
+float Cleaner2[8] = {6.700, 1.000, 0.300, 0.100, 0.100, 0.990, 7.100, 1028.400};
+float Cleaner3[8] = {3.900, 2.900, 1.400, 0.700, 0.400, 0.530, 3.800, 418.500};
+float Cleaner4[8] = {7.800, 1.400, 0.300, 0.100, 0.100, 0.980, 5.600, 1198.000};
 extern NilmAppliance gNilmAppliances[100];
 
 #define MAX_ID_MAP 10
@@ -84,8 +89,12 @@ typedef struct {
 } __attribute__ ((packed)) TEST;
 
 TEST test[3];
-int main() {
 
+
+
+int main() {
+    printf("%d\n",getCurTime());
+    nilm_main();
 //    struct timeval tv_begin, tv_end;
 //    gettimeofday(&tv_begin, NULL);
 //    gettimeofday(&tv_end, NULL);
@@ -163,7 +172,7 @@ int main() {
      * 识别流程开始
      */
     //根据最新电压更新在线电器列表的功率
-    updateOnlineAppPower(220);
+    updateOnlineListPowerByVol(220);
     MatchedAppliance m1, m2, m3, m4, m5;
     m1.activePower = 1000;
     m1.id = 1;

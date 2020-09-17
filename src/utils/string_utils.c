@@ -18,3 +18,12 @@ void subString(char *src, int start,int len,char* sub) {
         return;
     strncpy(sub, src + start, len);
 }
+
+int startWith(char *src, char *sub) {
+
+    int srcLen=strlen(src);
+    int subLen = strlen(sub);
+    if (src == NULL || sub == NULL || srcLen < subLen)
+        return 0;
+    return strncmp(src, sub, subLen) == 0;
+}

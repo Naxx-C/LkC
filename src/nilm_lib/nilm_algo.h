@@ -37,14 +37,6 @@ typedef struct {
     float activePower; //有功功率
     float reactivePower; //无功功率
 } StableFeature;
-//typedef struct {
-//
-//    float deltaPower; // delta active power
-//    float deltaPowerFactor;
-//    float linePower; // powerline's total power
-//    float voltage;
-//    int eventTime; // in second
-//} __attribute__ ((packed)) NilmEventFootprint;
 
 double featureMatch(float fv1[], float normalizedFv2[]);
 int getRatioLevel(float fv[]);
@@ -53,6 +45,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
 NilmAppliance* createNilmAppliance(char name[], int nameLen, char id, float accumulatedPower);
 int getNilmAlgoVersion();
 void setNilmWorkEnv(int env);
+int nilmInit();
 int getNilmWorkEnv();
 void setNilmMinEventStep(int minEventStep);
 void setInitWaitingCheckStatus(OnlineAppliance *oa);

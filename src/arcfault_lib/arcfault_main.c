@@ -166,9 +166,9 @@ int arcfault_main() {
     }
     if (dir != NULL)
         closedir(dir);
-    int t1 = printCurTime();
+    int t1 = getCurTime();
     sleep(3);
-    int t2 = printCurTime();
+    int t2 = getCurTime();
     printf("%d %d %d", t1, t2, t2 - t1);
 //    } //TODO:loop test, to remove
 

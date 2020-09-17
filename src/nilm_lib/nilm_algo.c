@@ -43,12 +43,16 @@ static NilmEvent gNilmEvents[NILMEVENT_MAX_NUM]; //待处理的事件
 #define FOOTPRINT_SIZE 100
 static NilmEventFootprint gFootprints[FOOTPRINT_SIZE]; //存储事件足迹
 static int gNilmWorkEnv = ENV_SIMPLE_TEST;
-static int gNilmMinEventStep = 70;
+static int gNilmMinEventStep = 100;
 
 const static int MAX_APPLIANCE_NUM = 100;
 NilmAppliance gNilmAppliances[100];
 int gAppliancesWriteIndex = 0; //init 0
 int gAppliancesCounter = 0; //init 0
+
+int nilmInit() {
+    return 0;
+}
 
 NilmAppliance* createNilmAppliance(char name[], int nameLen, char id, float accumulatedPower) {
 
@@ -92,13 +96,13 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     // if no valid effCurrent pass in, we calculate it.
     float effI = effCurrent >= 0 ? effCurrent : nilmEffectiveValue(current, 0, length);
     float effU = effVoltage >= 0 ? effVoltage : nilmEffectiveValue(voltage, 0, length);
-    float powerFactor = activePower / (effI * effU + 0.00001f);
+    float powerFactor = fabs(activePower / (effI * effU + 0.00001f));
 
     insertFifoBuffOne(gActivePBuff, EFF_BUFF_NUM, activePower);
     int isStable = nilmIsStable(gActivePBuff, EFF_BUFF_NUM, 30, 2);
 
     if (isStable != gLastStable) {
-        printf(">>>stable status change, stable=%d\n", isStable);
+        //printf(">>>stable status change, stable=%d\n", isStable);
     }
     // 稳态
     if (isStable > 0) {
@@ -131,7 +135,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             float deltaEffU = nilmEffectiveValue(gUBuff, zero2, 128);
             float deltaApparentPower = deltaEffI * deltaEffU;
             float deltaReactivePower = nilmGetReactivePowerByS(deltaActivePower, deltaApparentPower);
-            float deltaPowerFactor = deltaActivePower / deltaApparentPower;
+            float deltaPowerFactor = fabs(deltaActivePower) / deltaApparentPower;
 
             // feature3:
             gStartupTime = gTransitTime - EFF_BUFF_NUM + 1;
@@ -187,12 +191,13 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         ma.id = appliance.id;
                         ma.possiblity = possibility;
                         addToMatchedList(&ma);
+//                        printf("id=%d %.2f %.2f\n",ma.id,ma.activePower,ma.possiblity);
                     }
                 }
             }
 
             //TODO:特殊电器处理,临时方案
-            if (fabs(deltaReactivePower) >= 120 && fabs(deltaActivePower) >= 300 && harmonicBaseRatio >= 10) {
+            if (fabs(deltaReactivePower) >= 100 && fabs(deltaActivePower) >= 250 && harmonicBaseRatio >= 10) {
 
                 StableFeature sf;
                 memset(&sf, 0, sizeof(sf));
@@ -205,27 +210,32 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 //微波炉
                 if (sf.flatNum == 0 && sf.extremeNum == 6 && harmonicBaseRatio >= 30
                         && fabs(deltaReactivePower) >= 300 && fabs(deltaActivePower) >= 900
-                        && !isOnline(APPID_MICROWAVE_OVEN)) {
+                        && !isInMatchedList(APPID_MICROWAVE_OVEN)) {
                     ma.id = APPID_MICROWAVE_OVEN;
                 }
                 //半波电吹风
                 else if (sf.flatNum >= 14 && sf.flatNum <= 18 && sf.extremeNum == 1
                         && fabs(deltaReactivePower) >= 300 && fabs(deltaActivePower) >= 300
-                        && !isOnline(APPID_HAIRDRYER)) {
+                        && !isInMatchedList(APPID_HAIRDRYER)) {
                     ma.id = APPID_HAIRDRYER;
                 }
                 //定频空调(启动冲击大)
-                else if (iPulse >= 2.5 && fabs(deltaReactivePower) >= 200
-                        && !isOnline(APPID_FIXFREQ_AIRCONDITIONER)) {
+                else if ((iPulse >= 2.5 || fabs(deltaReactivePower) >= 200 || fabs(sf.reactivePower) >= 220)
+                        && !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)
+                        && !isOnline(APPID_VARFREQ_AIRCONDITIONER)) { //变频定频互斥
                     ma.id = APPID_FIXFREQ_AIRCONDITIONER;
+                    nilmGetStableFeature(gIBuff, zero2, 128, gUBuff, zero2, 128, effI, effU, activePower, &sf);
                 }
                 //变频空调
-                else if (!isOnline(APPID_VARFREQ_AIRCONDITIONER)) {
+                else if (!isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
+                        && !isOnline(APPID_FIXFREQ_AIRCONDITIONER)) {
                     ma.id = APPID_VARFREQ_AIRCONDITIONER;
                 }
 
-                if (ma.id != 0)
+                if (ma.id != 0) {
                     addToMatchedList(&ma);
+//                    printf("id=%d %.2f %.2f\n", ma.id, ma.activePower, ma.possiblity);
+                }
             }
 
             signed char bestMatchedId = -1;
@@ -488,6 +498,7 @@ char nilmGetStableFeature(float *cur, int curStart, int curLen, float *vol, int 
         return -1;
     float max = -999, min = 999;
     float c[33]; // 扩充1位
+    memset(&c, 0, sizeof(c));
     for (int i = 0; i < 128; i += BATCH) {
         for (int j = 0; j < BATCH; j++) {
             c[i / BATCH] += cur[curStart + i + j] / BATCH;

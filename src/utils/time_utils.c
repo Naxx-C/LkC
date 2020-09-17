@@ -7,12 +7,12 @@
 /**
  * return returns the time as the number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC)
  */
-int printCurTime(void) {
+int getCurTime(void) {
     time_t timep;
     struct tm *p;
     int t = time(&timep);
     p = gmtime(&timep);
-    printf("%d-%d-%d %d:%d:%d\n",1900 + p->tm_year, 1 + p->tm_mon, p->tm_mday, 8 + p->tm_hour, p->tm_min, p->tm_sec); /*获取当前秒*/
+//    printf("%d-%d-%d %d:%d:%d\n",1900 + p->tm_year, 1 + p->tm_mon, p->tm_mday, 8 + p->tm_hour, p->tm_min, p->tm_sec); /*获取当前秒*/
     return t;
 //    printf("%d\n", p->tm_sec); /*获取当前秒*/
 //    printf("%d\n", p->tm_min); /*获取当前分*/
