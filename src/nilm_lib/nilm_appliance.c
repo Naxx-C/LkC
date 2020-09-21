@@ -20,16 +20,6 @@ void addNormalizedFeature(NilmAppliance *na, float fv[]) {
     }
 }
 
-//typedef struct {
-//    signed char id;
-//    float minPower; //最小功率
-//    float maxPower; //最大功率
-//    char maybeModeChange; //运行过程中是否可能发生模式切换
-//    int minUseTime; //单次最小使用时长，单位S
-//    int maxUseTime; //单次最大使用时长
-//    int useHourBitmapInDay; //每日使用时间段,24小时用bitmap表示
-//    int supportedEnv;
-//}
 #define APPLIANCE_ADD_INFO_SIZE 30
 ApplianceAdditionalInfo gApplianceAdditionalInfos[APPLIANCE_ADD_INFO_SIZE];
 //TODO:待补充

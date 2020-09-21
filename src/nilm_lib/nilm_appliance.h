@@ -30,7 +30,7 @@ typedef struct {
 } ApplianceAdditionalInfo;
 
 #define ENV_FULL  0xFF             //全开放
-#define ENV_HOME (0x1 << 0)       //家庭环境(
+#define ENV_HOME (0x1 << 0)       //家庭环境
 #define  ENV_OFFICE (0x1 << 1)    //办公室环境
 #define ENV_SIMPLE_TEST (0x1 << 2) //简易/临时搭建的测试环境
 

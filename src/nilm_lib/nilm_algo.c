@@ -235,7 +235,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 }
 
                 if (ma.id != 0) {
-                    ApplianceAdditionalInfo* appInfo = getApplianceAdditionalInfo(ma.id);
+                    ApplianceAdditionalInfo *appInfo = getApplianceAdditionalInfo(ma.id);
                     if (appInfo == NULL || (appInfo->supportedEnv & gNilmWorkEnv) > 0) {
                         addToMatchedList(&ma);
 //                    printf("id=%d %.2f %.2f\n", ma.id, ma.activePower, ma.possiblity);
@@ -444,7 +444,7 @@ void footprintsAnalyze(const NilmEventFootprint *const footprints, int footprint
 void handleApplianceOff(OnlineAppliance *oa) {
     if (oa->isConfirmed == 0) {
 
-        int runningTime = gUtcTime - oa->poweronTime;
+        int runningTime = (gUtcTime - oa->poweronTime) / 60; //min
         for (int i = 0; i < NILMEVENT_MAX_NUM; i++) {
             NilmEvent *ne = &(gNilmEvents[i]);
 
