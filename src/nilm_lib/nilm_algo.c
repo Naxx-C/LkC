@@ -190,8 +190,11 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         ma.activePower = deltaActivePower;
                         ma.id = appliance.id;
                         ma.possiblity = possibility;
-                        addToMatchedList(&ma);
-//                        printf("id=%d %.2f %.2f\n",ma.id,ma.activePower,ma.possiblity);
+                        ApplianceAdditionalInfo *appInfo = getApplianceAdditionalInfo(ma.id);
+                        if (appInfo == NULL || (appInfo->supportedEnv & gNilmWorkEnv) > 0) {
+                            addToMatchedList(&ma);
+                            // printf("id=%d %.2f %.2f\n", ma.id, ma.activePower, ma.possiblity);
+                        }
                     }
                 }
             }
@@ -224,7 +227,6 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         && !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)
                         && !isOnline(APPID_VARFREQ_AIRCONDITIONER)) { //变频定频互斥
                     ma.id = APPID_FIXFREQ_AIRCONDITIONER;
-                    nilmGetStableFeature(gIBuff, zero2, 128, gUBuff, zero2, 128, effI, effU, activePower, &sf);
                 }
                 //变频空调
                 else if (!isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
@@ -233,8 +235,11 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 }
 
                 if (ma.id != 0) {
-                    addToMatchedList(&ma);
+                    ApplianceAdditionalInfo* appInfo = getApplianceAdditionalInfo(ma.id);
+                    if (appInfo == NULL || (appInfo->supportedEnv & gNilmWorkEnv) > 0) {
+                        addToMatchedList(&ma);
 //                    printf("id=%d %.2f %.2f\n", ma.id, ma.activePower, ma.possiblity);
+                    }
                 }
             }
 
@@ -250,6 +255,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 oa.activePower = deltaActivePower;
                 oa.possiblity = possibility;
                 oa.poweronTime = utcTime;
+                oa.eventId = utcTime;
                 oa.voltage = effU;
                 oa.estimatedActivePower = deltaActivePower;
                 if (nilmFeature.powerFactor >= 0.97f && nilmFeature.pulseI <= 1.03f
@@ -266,7 +272,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 if (oa.isConfirmed != 1) {
                     MatchedAppliance *matchedList = NULL;
                     int matchedListCounter = 0;
-                    getMatchedList(matchedList, &matchedListCounter);
+                    getMatchedList(&matchedList, &matchedListCounter);
                     if (matchedList != NULL && matchedListCounter > 0) {
                         for (int i = 0; i < matchedListCounter; i++) {
                             MatchedAppliance *m = &(matchedList[i]);
@@ -475,7 +481,7 @@ void handleApplianceOff(OnlineAppliance *oa) {
         }
     }
 
-    if (oa->isConfirmed == 0 || oa->category != CATEGORY_HEATING) {
+    if (oa->isConfirmed == 0 && oa->category != CATEGORY_HEATING) {
         oa->category = CATEGORY_UNKNOWN;
     }
 
@@ -582,7 +588,7 @@ void checkWaitingNilmEvents(int currentTime) {
         //延时确认事件处理
         OnlineAppliance *onlineList = NULL;
         int onlineListCounter = 0;
-        getOnlineList(onlineList, &onlineListCounter);
+        getOnlineList(&onlineList, &onlineListCounter);
         if (onlineList != NULL && onlineListCounter > 0) {
             for (int i = 0; i < NILMEVENT_MAX_NUM; i++) {
                 NilmEvent *ne = &(gNilmEvents[i]);

@@ -22,16 +22,17 @@ typedef struct {
     float minPower; //最小功率
     float maxPower; //最大功率
     char maybeModeChange; //运行过程中是否可能发生模式切换
-    int minUseTime; //单次最小使用时长，单位S
+    int minUseTime; //单次最小使用时长，单位min
     int maxUseTime; //单次最大使用时长
     int useHourBitmapInDay; //每日使用时间段,24小时用bitmap表示
+    short useMonthBitmapInYear; //每年使用月份,12个月bitmap表示
     int supportedEnv;
 } ApplianceAdditionalInfo;
 
 #define ENV_FULL  0xFF             //全开放
-#define ENV_HOME (0x1 << 1)       //家庭环境(
-#define  ENV_OFFICE (0x1 << 2)    //办公室环境
-#define ENV_SIMPLE_TEST (0x1 << 3) //简易/临时搭建的测试环境
+#define ENV_HOME (0x1 << 0)       //家庭环境(
+#define  ENV_OFFICE (0x1 << 1)    //办公室环境
+#define ENV_SIMPLE_TEST (0x1 << 2) //简易/临时搭建的测试环境
 
 #define APPID_FIXFREQ_AIRCONDITIONER 0x01
 #define APPID_VARFREQ_AIRCONDITIONER 0x02

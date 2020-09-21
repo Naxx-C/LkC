@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include "nilm_algo.h"
 #include "fft.h"
-static char *dirPath = "F:\\Tmp";
+static char *dirPath = "F:\\Tmp\\nilm";
 
 static float Cleaner1[8] = { 3.400, 2.600, 1.400, 0.700, 0.500, 0.550, 4.300, 382.300};
 static float Cleaner2[8] = {6.700, 1.000, 0.300, 0.100, 0.100, 0.990, 7.100, 1028.400};

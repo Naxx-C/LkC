@@ -36,7 +36,7 @@ void addToMatchedList(MatchedAppliance *new);
 void clearMatchedList();
 
 void getBestMatchedApp(float deltaActivePower, signed char *bestMatchedId,float* possibility);
-void getMatchedList(MatchedAppliance *matchedList, int *matchedListCounter);
+void getMatchedList(MatchedAppliance **matchedList, int *matchedListCounter);
 char isInMatchedList(signed char id);
 
 void updateOnlineListByEvent(OnlineAppliance *new);
@@ -49,7 +49,7 @@ void removeFromOnlineList(signed char id);
 char isOnline(signed char id);
 char isOnlineByEventId(int eventId);
 
-void getOnlineList(OnlineAppliance *onlineList, int *size);
+void getOnlineList(OnlineAppliance **onlineList, int *size);
 float getOnlineListPower();
 void updateOnlineListPowerByVol(float voltage);
 void adjustAirConditionerPower(float totalPower);

@@ -49,8 +49,9 @@ void addToMatchedList(MatchedAppliance *new) {
     }
 }
 
-void getMatchedList(MatchedAppliance *matchedList, int *matchedListCounter) {
-    matchedList = gMatchedList;
+//赋值指针，用二级指针
+void getMatchedList(MatchedAppliance **matchedList, int *matchedListCounter) {
+    *matchedList = gMatchedList;
     *matchedListCounter = gMatchedListCounter;
 }
 
@@ -254,9 +255,9 @@ void removeFromOnlineList(signed char id) {
     }
 }
 
-void getOnlineList(OnlineAppliance *onlineList, int *onlineListCounter) {
+void getOnlineList(OnlineAppliance **onlineList, int *onlineListCounter) {
 
-    onlineList = gOnlineList;
+    *onlineList = gOnlineList;
     *onlineListCounter = gOnlineListCounter;
 }
 

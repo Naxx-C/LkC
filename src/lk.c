@@ -91,10 +91,19 @@ typedef struct {
 TEST test[3];
 
 
+int x921[3];
+void getX(int **y){
+    *y= x921;
+}
 
 int main() {
-    printf("%d\n",getCurTime());
-    nilm_main();
+    x921[0]=3;
+    int *y=NULL;
+    getX(&y);
+    printf("%p %d\n",y,*y);
+
+//    printf("%d\n",getCurTime());
+//    nilm_main();
 //    struct timeval tv_begin, tv_end;
 //    gettimeofday(&tv_begin, NULL);
 //    gettimeofday(&tv_end, NULL);
