@@ -65,8 +65,8 @@ char isInMatchedList(signed char id) {
 
     for (int i = 0; i < gMatchedListCounter; i++) {
         MatchedAppliance *m = &(gMatchedList[i]);
-        if (id==m->id) {
-           return 1;
+        if (id == m->id) {
+            return 1;
         }
     }
     return 0;
@@ -174,8 +174,7 @@ void updateOnlineAppPower(signed char id, float activePower) {
             OnlineAppliance *o = &(gOnlineList[i]);
             if (o->id == id) {
                 o->runningMaxActivePower =
-                        o->runningMaxActivePower > activePower?
-                                o->runningMaxActivePower :activePower;
+                        o->runningMaxActivePower > activePower ? o->runningMaxActivePower : activePower;
                 o->activePower = activePower;
             }
         }
@@ -278,7 +277,7 @@ float getOnlineListPowerWithoutAC() {
     float power = 0;
     for (int i = 0; i < gOnlineListCounter; i++) {
         OnlineAppliance *o = &(gOnlineList[i]);
-        if (o->id != APPID_FIXFREQ_AIRCONDITIONER && o->id != APPID_VARFREQ_AIRCONDITIONER){
+        if (o->id != APPID_FIXFREQ_AIRCONDITIONER && o->id != APPID_VARFREQ_AIRCONDITIONER) {
             power += o->activePower;
         }
     }
@@ -302,8 +301,32 @@ void powerCheck(float totalPower) {
                     tmpMin = delta;
                 }
             }
-            if (idMin >= 0)
+            if (idMin > NULL_APP_ID)
                 removeFromOnlineList(idMin);
+        }
+    }
+}
+
+//移除小功率
+void removeLowPowerAppliance(float limit) {
+    for (int i = 0; i < gOnlineListCounter; i++) {
+        OnlineAppliance *o = &(gOnlineList[i]);
+        if (o->id <= NULL_APP_ID)
+            continue;
+        if (o->activePower < limit) {
+            removeFromOnlineList(o->id);
+        }
+    }
+}
+
+//修改小功率电器id
+void modifyLowPowerId(int dstId, float powerHighLimit) {
+    for (int i = 0; i < gOnlineListCounter; i++) {
+        OnlineAppliance *o = &(gOnlineList[i]);
+        if (o->id <= NULL_APP_ID)
+            continue;
+        if (o->activePower < powerHighLimit && o->isConfirmed == 0) {
+            o->id = dstId;
         }
     }
 }
@@ -311,15 +334,19 @@ void powerCheck(float totalPower) {
 //空调功率调整
 void adjustAirConditionerPower(float totalPower) {
 
-    if(isOnline(APPID_FIXFREQ_AIRCONDITIONER)){
+    if (isOnline(APPID_FIXFREQ_AIRCONDITIONER)) {
         float acPower = totalPower - getOnlineListPowerWithoutAC();
-        if (acPower >= 0) {
+        if (acPower < 100) {
+            removeFromOnlineList(APPID_FIXFREQ_AIRCONDITIONER);
+        } else if (acPower >= 0) {
             updateOnlineAppPower(APPID_FIXFREQ_AIRCONDITIONER, acPower);
         }
     }
-    if(isOnline(APPID_VARFREQ_AIRCONDITIONER)){
+    if (isOnline(APPID_VARFREQ_AIRCONDITIONER)) {
         float acPower = totalPower - getOnlineListPowerWithoutAC();
-        if (acPower >= 0) {
+        if (acPower < 100) {
+            removeFromOnlineList(APPID_VARFREQ_AIRCONDITIONER);
+        } else if (acPower >= 0) {
             updateOnlineAppPower(APPID_VARFREQ_AIRCONDITIONER, acPower);
         }
     }

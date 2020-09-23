@@ -31,6 +31,7 @@ typedef struct {
 } MatchedAppliance;
 
 void addToMatchedList(MatchedAppliance *new);
+void modifyLowPowerId(int dstId, float powerHighLimit);
 
 //gMatchedList为临时数组,使用前恢复
 void clearMatchedList();

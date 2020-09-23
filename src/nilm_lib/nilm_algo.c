@@ -200,7 +200,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             }
 
             //TODO:特殊电器处理,临时方案
-            if (fabs(deltaReactivePower) >= 100 && fabs(deltaActivePower) >= 250 && harmonicBaseRatio >= 10) {
+            if (fabs(deltaReactivePower) >= 100 && fabs(deltaActivePower) >= 200 && harmonicBaseRatio >= 10) {
 
                 StableFeature sf;
                 memset(&sf, 0, sizeof(sf));
@@ -208,7 +208,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                 MatchedAppliance ma;
                 memset(&ma, 0, sizeof(ma));
                 ma.activePower = deltaActivePower;
-                ma.possiblity = 84.8; //虚拟固定一个概率
+                ma.possiblity = 88.8; //虚拟固定一个概率
 
                 //微波炉
                 if (sf.flatNum == 0 && sf.extremeNum == 6 && harmonicBaseRatio >= 30
@@ -223,15 +223,19 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                     ma.id = APPID_HAIRDRYER;
                 }
                 //定频空调(启动冲击大)
-                else if ((iPulse >= 2.5 || fabs(deltaReactivePower) >= 200 || fabs(sf.reactivePower) >= 220)
+                else if ((iPulse >= 2.5 || fabs(deltaReactivePower) >= 300 || fabs(sf.reactivePower) >= 300)
                         && !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)
                         && !isOnline(APPID_VARFREQ_AIRCONDITIONER)) { //变频定频互斥
                     ma.id = APPID_FIXFREQ_AIRCONDITIONER;
+                    //TODO: tmp
+                    modifyLowPowerId(ma.id, 350);
                 }
                 //变频空调
                 else if (!isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
                         && !isOnline(APPID_FIXFREQ_AIRCONDITIONER)) {
                     ma.id = APPID_VARFREQ_AIRCONDITIONER;
+                    //TODO: tmp
+                    modifyLowPowerId(ma.id, 350);
                 }
 
                 if (ma.id != 0) {
@@ -311,7 +315,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
 //            checkWaitingNilmEvents(utcTime);
         }
 
-        //TODO:空调临时方案
+        //TODO:空调临时方案，关空调有问题
         adjustAirConditionerPower(activePower);
         powerCheck(activePower);
 
