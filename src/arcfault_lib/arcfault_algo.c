@@ -59,13 +59,13 @@ static float **gEffBuff = NULL;
 static float **gAverageBuff = NULL;
 static float **gHarmonicBuff = NULL;
 
-static float *mLastPeriodPiont = NULL;
+static float **gAdditionalBuff = NULL;
 static char *gIsFirst = NULL;
 static char gOutMsg[64] = { 0 };
 
 extern char *APP_BUILD_DATE;
 char gIsLibExpired = 1;
-const char *EXPIRED_DATE = "2020-12-30";
+const char *EXPIRED_DATE = "2021-12-30";
 // prebuiltDate sample "Mar 03 2020"
 int isExpired(const char *prebuiltDate, const char *expiredDate) {
     if (prebuiltDate == NULL || expiredDate == NULL)
@@ -172,8 +172,11 @@ int arcAlgoInit(int channelNum) {
         memset(gHarmonicBuff[i], 0, sizeof(float) * CYCLE_NUM_1S);
     }
 
-    mLastPeriodPiont = (float*) malloc(sizeof(float) * gChannelNum);
-    memset(mLastPeriodPiont, 0, sizeof(float) * gChannelNum);
+    gAdditionalBuff = (float**) malloc(sizeof(float*) * gChannelNum);
+    for (int i = 0; i < gChannelNum; i++) {
+        gAdditionalBuff[i] = (float*) malloc(sizeof(float) * 5);
+        memset(gAdditionalBuff[i], 0, sizeof(float) * 5);
+    }
 
     gIsFirst = (char*) malloc(sizeof(char) * gChannelNum);
     memset(gIsFirst, 1, sizeof(char) * gChannelNum);
@@ -224,40 +227,56 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
     }
 
     int resArcNum = 0, easyArcNum = 0, inductArcNum = 0;
-    float d1[length]; // 一重微分
-    float d1abs[length];
+    float d1[128 + 4]; // 一重微分
+    float d1abs[128 + 4];
+    float processCurrent[128 + 4];
     float maxD1abs = 0;
 
     // 防止跳变刚好发生在两个周期的交界处
     if (!gIsFirst[channel]) {
-        d1[0] = current[0] - mLastPeriodPiont[channel];
-        d1abs[0] = d1[0] > 0 ? d1[0] : -d1[0];
-        maxD1abs = d1abs[0];
+        for (int i = 0, j = 0; i < 128 + 4; i++) {
+            if (i < 4) {
+                processCurrent[i] = gAdditionalBuff[channel][i + 1]; // 从1开始跳过index0
+            } else {
+                processCurrent[i] = current[j++];
+            }
+        }
+        d1[0] = gAdditionalBuff[channel][1] - gAdditionalBuff[channel][0];
+        for (int i = 1; i < 128 + 4; i++) {
+            d1[i] = processCurrent[i] - processCurrent[i - 1];
+            d1abs[i] = d1[i] > 0 ? d1[i] : -d1[i];
+            if (d1abs[i] > maxD1abs) {
+                maxD1abs = d1abs[i];
+            }
+        }
+
     } else {
+        for (int i = 0, j = 0; i < 128 + 4; i++) {
+            if (i < 4) {
+                processCurrent[i] = current[0]; // 从1开始跳过index0
+            } else {
+                processCurrent[i] = current[j++];
+            }
+        }
         d1[0] = 0;
-        d1abs[0] = 0;
+        for (int i = 1; i < 128 + 4; i++) {
+            d1[i] = processCurrent[i] - processCurrent[i - 1];
+            d1abs[i] = d1[i] > 0 ? d1[i] : -d1[i];
+            if (d1abs[i] > maxD1abs) {
+                maxD1abs = d1abs[i];
+            }
+        }
         gIsFirst[channel] = 0;
     }
-    mLastPeriodPiont[channel] = current[length - 1];
 
-    float maxPoint = current[0];
-    float minPoint = current[0];
-
-    for (int i = 1; i < length; i++) {
-        d1[i] = current[i] - current[i - 1];
-        d1abs[i] = d1[i] > 0 ? d1[i] : -d1[i];
-        if (d1abs[i] > maxD1abs)
-            maxD1abs = d1abs[i];
-        if (current[i] > maxPoint)
-            maxPoint = current[i];
-        else if (current[i] < minPoint)
-            minPoint = current[i];
+    for (int i = 0; i < 5; i++) {
+        gAdditionalBuff[channel][i] = current[123 + i];
     }
-    float averageDelta = arcuMean(d1abs, length);
-    float threshDelta = arcuThreshAverage(d1abs, length, averageDelta / 2); // 除去平肩部分
-    float effValue = effCurrent >= 0 ? effCurrent : arcuEffectiveValue(current, length);
+    float averageDelta = arcuMean(d1abs, 128);
+    float threshDelta = arcuThreshAverage(d1abs, 128, averageDelta / 2); // 除去平肩部分
+    float effValue = effCurrent >= 0 ? effCurrent : arcuEffectiveValue(processCurrent, 128);
 
-    float averageValue = arcuMean(current, 128);
+    float averageValue = arcuMean(processCurrent, 128);
     // 电流递增递减趋势判断
     int lastArcBuffIndex = gArcBuffIndex[channel] >= 1 ? gArcBuffIndex[channel] - 1 : CYCLE_NUM_1S - 1;
     if (effValue < gEffBuff[channel][lastArcBuffIndex] * 0.95f) {
@@ -271,7 +290,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         gEffMonoDecCounter[channel] = 0;
     }
 
-    float health = arcuGetHealth(d1, d1abs, length, averageDelta / 3);
+    float health = arcuGetHealth(d1, d1abs, 128, averageDelta / 3);
     if (maxD1abs > threshDelta * gResJumpRatio && maxD1abs > gResJumpThresh) {
         pBigJumpCounter[channel]++;
     }
@@ -280,9 +299,9 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
     if (maxD1abs >= 1.0f) {
         int lastBigJumpIndex = -1;
         double lastBigJumpVal = 0;
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < 128; i++) {
             if (d1abs[i] > averageDelta * 5
-                    || (abs(lastBigJumpVal) > averageDelta * 10 && d1abs[i] > averageDelta * 4)) {
+                    || (fabs(lastBigJumpVal) > averageDelta * 10 && d1abs[i] > averageDelta * 4)) {
 
                 if (lastBigJumpIndex >= 0 && d1[i] * lastBigJumpVal < 0 && i - lastBigJumpIndex <= 12
                         && i - lastBigJumpIndex >= 4) {
@@ -304,18 +323,17 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
 
     // 阻性负载
     int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
-    if (health >= 76.0f && effValue >= 1.5f && maxD1abs > 1.0f) {
+    if (health >= 70.0f && effValue >= 1.5f && maxD1abs > 1.0f) {
         // 最后3个点的电弧信息缺少，容易误判，忽略
-        const int PARTIAL_MAX_INDEX = 3;
-        for (int i = 1; i < length - PARTIAL_MAX_INDEX; i++) {
+        for (int i = 1; i < 128; i++) {
             if (d1abs[i] > gResJumpRatio * threshDelta && d1abs[i] >= gResJumpThresh) {
-
-                int faultIndex = i;
+                int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
+                int faultIndex = i, extraTraverseSkip = 8;
 
                 // 正击穿时要求故障电弧点电压为正,取0.1为近似值
                 if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_PN]) {
-                    if ((d1[i] > 0 && (current[i - 1] < -0.1f || current[i] < 0.1f))
-                            || (d1[i] < 0 && (current[i - 1] > 0.1f || current[i] > -0.1f))) {
+                    if ((d1[i] > 0 && (processCurrent[i - 1] < -0.1f || processCurrent[i] < 0.1f))
+                            || (d1[i] < 0 && (processCurrent[i - 1] > 0.1f || processCurrent[i] > -0.1f))) {
                         checkFailed = ARC_CON_PN;
                         easyCheckFailed = ARC_CON_PN;
                     }
@@ -325,7 +343,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 if ((checkFailed == 0 || easyCheckFailed == 0) && gCheckEnabled[ARC_CON_CONS]) {
 
                     // 顺序方向
-                    if (arcuIsConsistent(current, 128, d1[i], averageDelta, i, 4) == 0) {
+                    if (arcuIsConsistent(processCurrent, 128 + 4, d1[i], averageDelta, i, 4) == 0) {
                         checkFailed = ARC_CON_CONS;
                         easyCheckFailed = ARC_CON_CONS;
                     }
@@ -345,10 +363,11 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_EXTR]) {
 
                     int minExtremeDis = gMinExtremeDis;
-                    extIndex = arcuExtremeInRange(current, length, faultIndex, minExtremeDis, averageDelta);
+                    extIndex = arcuExtremeInRange(processCurrent, 128, faultIndex, minExtremeDis,
+                            averageDelta);
 
                     if ((extIndex >= faultIndex + minExtremeDis)
-                            || (extIndex < faultIndex && extIndex + length >= faultIndex + minExtremeDis)) {
+                            || (extIndex < faultIndex && extIndex + 128 >= faultIndex + minExtremeDis)) {
                         // pass
                     } else {
                         // 距离极值点不足1/8周期，很可能是吸尘器开关电源等短尖周期的波形
@@ -361,7 +380,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_WIDT]) {
 
                     int minWidth = gMinWidth;
-                    if (arcuGetWidth(current, length, faultIndex) >= minWidth) {
+                    if (arcuGetWidth(processCurrent, 128, faultIndex) >= minWidth) {
                         // pass
                     } else {
                         checkFailed = ARC_CON_WIDT;
@@ -371,17 +390,18 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 // 离散跳跃check，后续加和
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_POSSUM]) {
                     double sum = 0;
-                    for (int j = i + 1; j < i + 5 && j < length; j++) {
+                    for (int j = i + 1; j < i + 5 && j < 128 + 4; j++) {
                         sum += d1abs[j];
                     }
                     if (sum / d1abs[i] > 2) {
-                        break;
+                        checkFailed = ARC_CON_POSSUM;
+                        extraTraverseSkip = 0;
                     }
                 }
 
                 // 大跳跃数限制
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_BJ]) {
-                    int biggerNum = arcuGetBigNum(d1abs, length, d1abs[i], 0.8f);
+                    int biggerNum = arcuGetBigNum(d1abs, 128, d1abs[i], 0.8f);
                     if (biggerNum >= 3) {
                         checkFailed = ARC_CON_BJ;
                     }
@@ -389,21 +409,21 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
 
                 // 离散跳跃check，此后的跳跃*Ratio不可以比当前跳跃还大
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_POSJ]) {
-                    for (int j = i + 1; j < i + PARTIAL_MAX_INDEX && j < length; j++) {
+                    for (int j = i + 1; j < i + 4 && j < 128; j++) {
                         if (d1abs[j] * gResFollowJumpMaxRatio >= d1abs[i]) {
                             checkFailed = ARC_CON_POSJ;
-                            break;
                         }
                     }
                 }
 
                 if (checkFailed == 0) {
                     resArcNum++;
+                    extraTraverseSkip = 30;
                 }
                 if (easyCheckFailed == 0) {
                     easyArcNum++;
                 }
-                i += 8;
+                i += extraTraverseSkip;
             }
         }
 
@@ -437,19 +457,18 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
 
     // 综合判断是否需要故障电弧报警
 
-    int resArcNum1S = 0, inductArcNum1S = 0, parallelArcNum1S = 0, unbalanceNum1S = 0;
+    int resArcNum1S = 0, inductArcNum1S = 0, parallelArcNum1S = 0, unbalanceNum1S = 0, workPeriodNum1S = 0,
+            easyArcNum1S = 0;
     int dutyCounter = 0, dutyRatio = 0, tmpSeries = 0, maxSeries = 0;
     int resArcStart = -1, resArcEnd = -1, inductArcStart = -1, inductArcEnd = -1, resArcLen = 0,
             inductArcLen = 0;
     for (int i = gArcBuffIndex[channel]; i < gArcBuffIndex[channel] + CYCLE_NUM_1S; i++) {
         int index = i % CYCLE_NUM_1S;
         resArcNum1S += gResArcBuff[channel][index];
+        easyArcNum1S += gEasyArcBuff[channel][index];
         inductArcNum1S += gInductArcBuff[channel][index];
         if (gEffBuff[channel][index] >= gParallelArcThresh) {
             parallelArcNum1S++;
-        }
-        if (gAverageBuff[channel][index] >= 1) {
-            unbalanceNum1S++;
         }
         if (gResArcBuff[channel][index] > 0) {
             if (resArcStart < 0) {
@@ -462,6 +481,14 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 inductArcStart = i;
             }
             inductArcEnd = i;
+        }
+        // 避免和其他类型重复计算
+        if (gEffBuff[channel][index] < gParallelArcThresh && gResArcBuff[channel][index] == 0
+                && gInductArcBuff[channel][index] == 0 && gAverageBuff[channel][index] >= 1) {
+            unbalanceNum1S++;
+        }
+        if (gEffBuff[channel][index] >= 4) {
+            workPeriodNum1S++;
         }
 
         // if (gResArcBuff[channel][index] > 0) {
@@ -484,7 +511,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         dutyRatio = (dutyCounter * 100) / resArcLen;
     }
 
-    int arcNum1S = resArcNum1S + inductArcNum1S + parallelArcNum1S;
+    int arcNum1S = resArcNum1S + inductArcNum1S + parallelArcNum1S + unbalanceNum1S;
     if (outArcNum != NULL)
         *outArcNum = arcNum1S;
     // 记录当前周期128个点的电弧数
@@ -492,22 +519,28 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
         *thisPeriodNum = resArcNum + inductArcNum;
 
     // 检测到电弧14个->进入待确认状态->在待确认期间发现不符合条件直接进入免疫->切出稳态后再继续进入正常检测期
-    int fluctCheckEnd = gArcBuffIndex[channel], fluctCheckLen = CYCLE_NUM_1S;   // totalLen > 3 ? totalLen - 3
+    int fluctCheckEnd = gArcBuffIndex[channel], fluctCheckLen = CYCLE_NUM_1S; // totalLen > 3 ? totalLen - 3
+
+    char parallelArcTrigger = 0;
+    // 并联电弧
+    if ((parallelArcNum1S >= 8 && (resArcNum1S + inductArcNum1S) >= 0 && unbalanceNum1S >= 2)
+            || (parallelArcNum1S >= 7 && (resArcNum1S + inductArcNum1S) >= 1 && unbalanceNum1S >= 2)) {
+        parallelArcTrigger = 1;
+    }
     switch (gStatus[channel]) {
     case STATUS_NORMAL:
         // 进入免疫状态：1.占空比过大 2.一个周期检测到双弧超过40% 3.最大连续序列过长
-        if (arcNum1S >= gAlarmThresh) {
+        if (arcNum1S >= gAlarmThresh || parallelArcTrigger) {
             // 全是阻性负载电弧的话，要求基本稳定
-            if (inductArcNum1S == 0
-                    && arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen,
-                            0.2f) >= 8) {
-                gStatus[channel] = STATUS_IMMUNE;
-                break;
-            }
+            // if (inductArcNum1S == 0 && Utils.arcLastestFluctuation(gEffBuff[channel],
+            // CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen, 0.2f) >= 8) {
+            // gStatus[channel] = STATUS_IMMUNE;
+            // break;
+            // }
 
             gWatingTime[channel] = gTimer[channel];
             gStatus[channel] = STATUS_WAITING_CHECK;
-            gArcNumAlarming[channel] = arcNum1S;                        // 记录当前电弧数目，留做报警时传递
+            gArcNumAlarming[channel] = arcNum1S; // 记录当前电弧数目，留做报警时传递
         } else if (inductArcNum1S >= 3 && inductArcEnd - inductArcStart >= 6) {
 
             double averageBuffFluct = arcLastestFluctuation(gAverageBuff[channel],
@@ -516,7 +549,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 break;
             gWatingTime[channel] = gTimer[channel];
             gStatus[channel] = STATUS_WAITING_CHECK;
-            gArcNumAlarming[channel] = 14;                        // 记录当前电弧数目，留做报警时传递
+            gArcNumAlarming[channel] = 14; // 记录当前电弧数目，留做报警时传递
         }
         break;
     case STATUS_WAITING_CHECK:
@@ -531,17 +564,18 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
                 *outArcNum = gArcNumAlarming[channel]; // 报警时使用确认点时记录的数目
             return 1;
 
-        } else if (inductArcNum1S == 0 && effValue > 1
+        } else if (((inductArcNum1S + parallelArcNum1S) == 1000 && effValue > 1
                 && (gEffMonoDecCounter[channel] == 0 || gEffMonoDecCounter[channel] >= 3)
-                && arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen, 0.2f)
-                        >= 8) {
+                && arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen,
+                        0.2f) >= 8) || easyArcNum1S >= 25 || parallelArcNum1S >= 15) {
             gStatus[channel] = STATUS_IMMUNE;
             break;
         }
         break;
     case STATUS_IMMUNE:
         // 电流波动率超过5%或者谐波波动率超过10%
-        if (arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen, 0.2f) > 5) {
+        if (arcLastestFluctuation(gEffBuff[channel], CYCLE_NUM_1S, fluctCheckEnd, fluctCheckLen, 0.2f) > 15
+                && effCurrent >= 2) {
             gStatus[channel] = STATUS_NORMAL;
         }
         break;

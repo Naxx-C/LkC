@@ -35,9 +35,9 @@ extern NilmAppliance gNilmAppliances[100];
 #define MAX_ID_MAP 10
 IdMap gIdMaps[MAX_ID_MAP];
 
-float current[128];
-float voltage[128];
-float oddFft[5] = { 3.08, 0.97, 0.29, 0.11, 0.06 };
+static float current[128];
+static float voltage[128];
+static float oddFft[5] = { 3.08, 0.97, 0.29, 0.11, 0.06 };
 
 void setFakeValue(float data[128],float val) {
     for(int i=0;i<128;i++){
@@ -46,6 +46,8 @@ void setFakeValue(float data[128],float val) {
 }
 int main() {
 
+    arcfault_main();
+    return 0;
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 1, "RadiantCooker", strlen("RadiantCooker"));
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 2, "Cleaner", strlen("Cleaner"));
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 3, "Microwave", strlen("Microwave"));

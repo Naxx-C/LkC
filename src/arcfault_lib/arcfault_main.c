@@ -87,23 +87,32 @@ static int parse(char *csvPath, int offset, float *currents, int len) {
 //static char *dirPath = "F:\\Tmp\\5kVA_binglian_0.7";
 //static char *dirPath = "F:\\Tmp\\5kVA_binglian_1";
 //static char *dirPath = "F:\\Tmp\\20200819_3kVA0.7(Fail)";
-static char *dirPath = "F:\\data\\tmp\\elec";
+//static char *dirPath = "F:\\Tmp\\10ka";
+static char *dirPath = "F:\\Tmp\\10ka0.3";
+//static char *dirPath = "F:\\Tmp\\xcq";
 //负载抑制
 //static char *dirPath = "F:\\Tmp\\restrictload_xialuzukang";
 
 //误报警测试
 //static char *dirPath = "F:\\Tmp\\falsealarm_cleaner";
 
-static const int CHANNEL = 3;
+static const int CHANNEL = 1;
+extern int *pBigJumpCounter;
 
 int arcfault_main() {
-    setArcAlarmThresh(10);
-    arcAlgoInit(CHANNEL);
-    setArcResJumpRatio(2.8f);
-    setArcInductJumpRatio(2.8f);
+    char ret = arcAlgoInit(CHANNEL);
+    if (ret > 1) {
+        printf("some error\n");
+        return -1;
+    }
+    setArcAlarmThresh(11);
+    setParallelArcThresh(46);
+    setArcResJumpRatio(2.35f);
+    setArcInductJumpRatio(2.35f);
     setArcCheckDisabled(ARC_CON_POSJ);
     setArcCheckDisabled(ARC_CON_BJ);
-    setParallelArcThresh(48);
+    setArcCheckDisabled(ARC_CON_EXTR);
+    setArcCheckDisabled(ARC_CON_WIDT);
 
     //灵敏版参数
     //    setArcResJumpRatio(2.5f);
@@ -118,12 +127,6 @@ int arcfault_main() {
     //    setArc2NumRatioThresh(200);
     //    setMaxSeriesThresh(200);
 
-    char ret = arcAlgoInit(CHANNEL);
-
-    if (ret > 1) {
-        printf("some error\n");
-        return -1;
-    }
     DIR *dir = NULL;
     struct dirent *entry;
 
@@ -136,7 +139,7 @@ int arcfault_main() {
     if ((dir = opendir(dirPath)) == NULL) {
         printf("opendir failed\n");
     } else {
-        char csv[500];
+        char csv[100];
         while ((entry = readdir(dir)) != NULL) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0
                     || !endWith(entry->d_name, ".csv")) ///current dir OR parrent dir
@@ -152,8 +155,8 @@ int arcfault_main() {
             int i = 0;
 
             while (!feof(f) && !ferror(f)) {
-                float cur, vol;
-                fscanf(f, "%f,%f", &cur, &vol);
+                float cur, vol,serial;
+                fscanf(f, "%f,%f,%f", &cur, &vol, &serial);
                 currents[i++] = cur;
                 fileIndex++;
                 if (i >= 128) {
@@ -186,13 +189,14 @@ int arcfault_main() {
 
         }
         for (int c = 0; c < CHANNEL; c++) {
-            printf("alarmNum=%d totalArc=%d pointNum=%d\n", alarmNum[c], totalArc[c], pointNum);
+            printf("alarmNum=%d totalArc=%d bigJump=%d pointNum=%d\n", alarmNum[c], totalArc[c],
+                    pBigJumpCounter[c], pointNum);
         }
     }
     if (dir != NULL)
         closedir(dir);
     int t1 = printCurTime();
-    sleep(3);
+//    sleep(3);
     int t2 = printCurTime();
     printf("%d %d %d", t1, t2, t2 - t1);
 //    } //TODO:loop test, to remove
