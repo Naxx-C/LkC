@@ -70,7 +70,7 @@ char arcuIsConsistent(float *current, int length, float direction, float thresh,
     int endIndex = startIndex + checkNum - 1;
 
 	float delta = current[endIndex] - current[startIndex];
-    if (direction * delta < 0 || Math.abs(delta) < thresh / 2)
+    if (direction * delta < 0 || fabs(delta) < thresh / 2)
         return 0;
 
     for (int i = startIndex; i < endIndex; i++) {
