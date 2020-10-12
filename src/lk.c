@@ -97,10 +97,11 @@ void getX(int **y){
 }
 
 int main() {
-    x921[0]=3;
-    int *y=NULL;
-    getX(&y);
-    printf("%p %d\n",y,*y);
+
+    int x=13,y=12;
+    float z[x-y];
+    z[0]=100;
+    printf("%f\n",z[0]);
 
 //    printf("%d\n",getCurTime());
 //    nilm_main();

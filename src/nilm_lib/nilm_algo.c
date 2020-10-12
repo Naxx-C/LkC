@@ -40,8 +40,8 @@ static float gLastProcessedStableActivePower = 0; //上次经过稳态事件处�
 
 #define NILMEVENT_MAX_NUM   50 // 最多储存的事件
 static NilmEvent gNilmEvents[NILMEVENT_MAX_NUM]; //待处理的事件
-#define FOOTPRINT_SIZE 100
-static NilmEventFootprint gFootprints[FOOTPRINT_SIZE]; //存储事件足迹
+#define FOOTPRINT_SIZE 120 // 30s采样一次，1个小时的数据
+static NilmPowerShaft gPowerShaft[FOOTPRINT_SIZE]; //存储电能足迹
 static int gNilmWorkEnv = ENV_SIMPLE_TEST;
 static int gNilmMinEventStep = 100;
 
@@ -96,7 +96,9 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     // if no valid effCurrent pass in, we calculate it.
     float effI = effCurrent >= 0 ? effCurrent : nilmEffectiveValue(current, 0, length);
     float effU = effVoltage >= 0 ? effVoltage : nilmEffectiveValue(voltage, 0, length);
-    float powerFactor = fabs(activePower / (effI * effU + 0.00001f));
+    float apparentPower = effI * effU;
+    float reactivePower = sqrt(apparentPower * apparentPower - activePower * activePower);
+    float adjustRatio = 220 * 220 / effU / effU;
 
     insertFifoBuffOne(gActivePBuff, EFF_BUFF_NUM, activePower);
     int isStable = nilmIsStable(gActivePBuff, EFF_BUFF_NUM, 30, 2);
@@ -200,52 +202,84 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             }
 
             //TODO:特殊电器处理,临时方案
-            if (fabs(deltaReactivePower) >= 100 && fabs(deltaActivePower) >= 200 && harmonicBaseRatio >= 10) {
-
+            char isHeatingApp = 0;
+            if (nilmFeature.powerFactor >= 0.97f && nilmFeature.pulseI <= 1.03f
+                    && nilmFeature.oddFft[0] / nilmFeature.oddFft[1] >= 20) {
+                isHeatingApp = 1;
+            }
+            if (reactivePower >= 100 && activePower >= 300 && !isHeatingApp && !isInMatchedList(APPID_CLEANER)
+                    && !isInMatchedList(APPID_MICROWAVE_OVEN)) {
                 StableFeature sf;
                 memset(&sf, 0, sizeof(sf));
                 nilmGetStableFeature(gIBuff, zero2, 128, gUBuff, zero2, 128, effI, effU, activePower, &sf);
                 MatchedAppliance ma;
                 memset(&ma, 0, sizeof(ma));
                 ma.activePower = deltaActivePower;
-                ma.possiblity = 88.8; //虚拟固定一个概率
-
-                //微波炉
-                if (sf.flatNum == 0 && sf.extremeNum == 6 && harmonicBaseRatio >= 30
-                        && fabs(deltaReactivePower) >= 300 && fabs(deltaActivePower) >= 900
-                        && !isInMatchedList(APPID_MICROWAVE_OVEN)) {
-                    ma.id = APPID_MICROWAVE_OVEN;
-                }
-                //半波电吹风
-                else if (sf.flatNum >= 14 && sf.flatNum <= 18 && sf.extremeNum == 1
+                ma.possiblity = 88.8; //虚拟固定一个概率f
+                if (sf.flatNum >= 14 && sf.flatNum <= 18 && sf.extremeNum == 1
                         && fabs(deltaReactivePower) >= 300 && fabs(deltaActivePower) >= 300
                         && !isInMatchedList(APPID_HAIRDRYER)) {
                     ma.id = APPID_HAIRDRYER;
                 }
-                //定频空调(启动冲击大)
-                else if ((iPulse >= 2.5 || fabs(deltaReactivePower) >= 300 || fabs(sf.reactivePower) >= 300)
-                        && !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)
-                        && !isOnline(APPID_VARFREQ_AIRCONDITIONER)) { //变频定频互斥
-                    ma.id = APPID_FIXFREQ_AIRCONDITIONER;
-                    //TODO: tmp
-                    modifyLowPowerId(ma.id, 350);
-                }
-                //变频空调
-                else if (!isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
-                        && !isOnline(APPID_FIXFREQ_AIRCONDITIONER)) {
-                    ma.id = APPID_VARFREQ_AIRCONDITIONER;
-                    //TODO: tmp
-                    modifyLowPowerId(ma.id, 350);
-                }
 
+                if (ma.id != 0 && !isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
+                        && !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)) {
+                    ma.id = APPID_VARFREQ_AIRCONDITIONER;
+                }
                 if (ma.id != 0) {
                     ApplianceAdditionalInfo *appInfo = getApplianceAdditionalInfo(ma.id);
                     if (appInfo == NULL || (appInfo->supportedEnv & gNilmWorkEnv) > 0) {
                         addToMatchedList(&ma);
-//                    printf("id=%d %.2f %.2f\n", ma.id, ma.activePower, ma.possiblity);
                     }
                 }
             }
+
+            /*if (fabs(deltaReactivePower) >= 100 && fabs(deltaActivePower) >= 200 && harmonicBaseRatio >= 10) {
+
+             StableFeature sf;
+             memset(&sf, 0, sizeof(sf));
+             nilmGetStableFeature(gIBuff, zero2, 128, gUBuff, zero2, 128, effI, effU, activePower, &sf);
+             MatchedAppliance ma;
+             memset(&ma, 0, sizeof(ma));
+             ma.activePower = deltaActivePower;
+             ma.possiblity = 88.8; //虚拟固定一个概率
+
+             //微波炉
+             if (sf.flatNum == 0 && sf.extremeNum == 6 && harmonicBaseRatio >= 30
+             && fabs(deltaReactivePower) >= 300 && fabs(deltaActivePower) >= 900
+             && !isInMatchedList(APPID_MICROWAVE_OVEN)) {
+             ma.id = APPID_MICROWAVE_OVEN;
+             }
+             //半波电吹风
+             else if (sf.flatNum >= 14 && sf.flatNum <= 18 && sf.extremeNum == 1
+             && fabs(deltaReactivePower) >= 300 && fabs(deltaActivePower) >= 300
+             && !isInMatchedList(APPID_HAIRDRYER)) {
+             ma.id = APPID_HAIRDRYER;
+             }
+             //定频空调(启动冲击大)
+             else if ((iPulse >= 2.5 || fabs(deltaReactivePower) >= 300 || fabs(sf.reactivePower) >= 300)
+             && !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)
+             && !isOnline(APPID_VARFREQ_AIRCONDITIONER)) { //变频定频互斥
+             ma.id = APPID_FIXFREQ_AIRCONDITIONER;
+             //TODO: tmp
+             modifyLowPowerId(ma.id, 350);
+             }
+             //变频空调
+             else if (!isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
+             && !isOnline(APPID_FIXFREQ_AIRCONDITIONER)) {
+             ma.id = APPID_VARFREQ_AIRCONDITIONER;
+             //TODO: tmp
+             modifyLowPowerId(ma.id, 350);
+             }
+
+             if (ma.id != 0) {
+             ApplianceAdditionalInfo *appInfo = getApplianceAdditionalInfo(ma.id);
+             if (appInfo == NULL || (appInfo->supportedEnv & gNilmWorkEnv) > 0) {
+             addToMatchedList(&ma);
+             //                    printf("id=%d %.2f %.2f\n", ma.id, ma.activePower, ma.possiblity);
+             }
+             }
+             }*/
 
             signed char bestMatchedId = -1;
             float possibility = 0;
@@ -301,14 +335,14 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
             }
 
             //事件足迹更新
-            NilmEventFootprint footprint;
-            footprint.deltaPower = deltaActivePower;
-            footprint.deltaPowerFactor = deltaPowerFactor;
-            footprint.eventTime = utcTime;
-            footprint.linePower = activePower;
-            footprint.voltage = effVoltage;
-            insertFifoCommon((char*) gFootprints, sizeof(gFootprints), (char*) (&footprint),
-                    sizeof(footprint));
+            NilmPowerShaft footprint;
+//            footprint.deltaPower = deltaActivePower;
+//            footprint.deltaPowerFactor = deltaPowerFactor;
+//            footprint.eventTime = utcTime;
+//            footprint.linePower = activePower;
+//            footprint.voltage = effVoltage;
+//            insertFifoCommon((char*) gFootprints, sizeof(gFootprints), (char*) (&footprint),
+//                    sizeof(footprint));
 
             gLastProcessedStableActivePower = activePower;
         } else { //非投切事件处理
@@ -405,44 +439,44 @@ int getRatioLevel(float fv[]) {
  * startTime: 分析的起始时间
  *
  */
-void footprintsAnalyze(const NilmEventFootprint *const footprints, int footprintSize, int startTime,
+void footprintsAnalyze(const NilmPowerShaft *const footprints, int footprintSize, int startTime,
         float minDeltaPower, FootprintResult *footprintResult) {
 
-    int flipTimes = 0; //切换次数
-    int maybeSteplessChange = 0; //判断是否有疑似无级变化
-    int timestartIndex = 0;
-    for (int i = 0; i < footprintSize; i++) {
-        NilmEventFootprint fp = footprints[i];
-        if (fp.eventTime < startTime) {
-            timestartIndex = i + 1; //记录起始处理的index
-            continue;
-        }
-
-        if (fp.deltaPower > minDeltaPower) {
-            flipTimes++;
-        } else {
-            continue;
-        }
-
-        if (fp.deltaPowerFactor <= 0.985) {
-            footprintResult->haveNonPureResLoad = 1;
-        }
-
-        if (i < footprintSize - 1 && maybeSteplessChange == 0) {
-            float delta = footprints[i + 1].deltaPower;
-
-            if (delta > 0 && i < footprintSize - 1) {
-                float lineDelta = footprints[i + 1].linePower - footprints[i].linePower;
-                //delta变化量比线路总负荷变化明显小 TODO:not best
-                if (lineDelta - delta > 120 && footprints[i + 1].eventTime - footprints[i].eventTime < 180) {
-                    maybeSteplessChange = 1;
-                }
-            }
-        }
-    }
-
-    footprintResult->flipTimes = flipTimes;
-    footprintResult->haveSteplessChange = 1;
+//    int flipTimes = 0; //切换次数
+//    int maybeSteplessChange = 0; //判断是否有疑似无级变化
+//    int timestartIndex = 0;
+//    for (int i = 0; i < footprintSize; i++) {
+//        NilmPowerShaft fp = footprints[i];
+//        if (fp.eventTime < startTime) {
+//            timestartIndex = i + 1; //记录起始处理的index
+//            continue;
+//        }
+//
+//        if (fp.deltaPower > minDeltaPower) {
+//            flipTimes++;
+//        } else {
+//            continue;
+//        }
+//
+//        if (fp.deltaPowerFactor <= 0.985) {
+//            footprintResult->haveNonPureResLoad = 1;
+//        }
+//
+//        if (i < footprintSize - 1 && maybeSteplessChange == 0) {
+//            float delta = footprints[i + 1].deltaPower;
+//
+//            if (delta > 0 && i < footprintSize - 1) {
+//                float lineDelta = footprints[i + 1].linePower - footprints[i].linePower;
+//                //delta变化量比线路总负荷变化明显小 TODO:not best
+//                if (lineDelta - delta > 120 && footprints[i + 1].eventTime - footprints[i].eventTime < 180) {
+//                    maybeSteplessChange = 1;
+//                }
+//            }
+//        }
+//    }
+//
+//    footprintResult->flipTimes = flipTimes;
+//    footprintResult->haveSteplessChange = 1;
 }
 
 void handleApplianceOff(OnlineAppliance *oa) {
@@ -607,7 +641,7 @@ void checkWaitingNilmEvents(int currentTime) {
                         if (ne->delayedTimer[j] >= currentTime) {
                             if (currentTime >= ne->delayedTimer[j]) {
                                 FootprintResult fr;
-                                footprintsAnalyze(gFootprints, FOOTPRINT_SIZE, ne->eventTime, 200, &fr);
+                                footprintsAnalyze(gPowerShaft, FOOTPRINT_SIZE, ne->eventTime, 200, &fr);
                             }
                             ne->delayedTimer[j] = 0; //delayedTimer复位
                         } else {

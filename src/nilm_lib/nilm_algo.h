@@ -18,12 +18,11 @@ typedef struct {
 
 typedef struct {
 
-    float deltaPower; // delta active power
-    float deltaPowerFactor;
-    float linePower; // powerline's total power
-    float voltage;
-    int eventTime; // in second
-} __attribute__ ((packed)) NilmEventFootprint;
+    float activePower; // powerline's total power, adjusted by voltage
+    float reactivePower;
+    float totalPowerCost;
+    int sampleTime; // in second
+} __attribute__ ((packed)) NilmPowerShaft;
 
 typedef struct {
     int flipTimes;
