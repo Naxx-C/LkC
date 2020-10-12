@@ -222,7 +222,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                     ma.id = APPID_HAIRDRYER;
                 }
 
-                if (ma.id != 0 && !isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
+                if (ma.id == 0 && !isInMatchedList(APPID_VARFREQ_AIRCONDITIONER)
                         && !isInMatchedList(APPID_FIXFREQ_AIRCONDITIONER)) {
                     ma.id = APPID_VARFREQ_AIRCONDITIONER;
                 }
