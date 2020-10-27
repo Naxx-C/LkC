@@ -9,7 +9,6 @@
 #include "nilm_onlinelist.h"
 #include <sys/time.h>
 
-const char *APP_BUILD_DATE = __DATE__;
 extern int arcfault_main();
 extern int nilm_algo_main();
 typedef struct {
@@ -96,12 +95,10 @@ void getX(int **y){
     *y= x921;
 }
 
+const char *APP_BUILD_DATE = __DATE__;
 int main() {
 
-    int x=13,y=12;
-    float z[x-y];
-    z[0]=100;
-    printf("%f\n",z[0]);
+    charging_alarm_main();
 
 //    printf("%d\n",getCurTime());
 //    nilm_main();
