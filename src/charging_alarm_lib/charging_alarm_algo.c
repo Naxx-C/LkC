@@ -234,9 +234,10 @@ int isChargingDevice(float *cur, int curStart, float *vol, int volStart, float *
     float thetaThresh = 13;
     int minExtreme = 2, maxExtreme = 2;
     int minFlat = 18;
+    float minActivePower = 80, minReactivePower = 100;
 
     switch (gMode) {
-    case CHARGING_ALARM_SENSITIVITY_LOW://低灵敏度
+    case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
         pulseIThresh = 3.0f;
         thetaThresh = 10;
         maxExtreme = 2;
@@ -248,11 +249,13 @@ int isChargingDevice(float *cur, int curStart, float *vol, int volStart, float *
         maxExtreme = 4;
         minFlat = 18;
         break;
-    case CHARGING_ALARM_SENSITIVITY_HIGH://高灵敏度
-        pulseIThresh = 1.05f;
+    case CHARGING_ALARM_SENSITIVITY_HIGH: //高灵敏度
+        pulseIThresh = 0.0f;
         thetaThresh = 18;
         maxExtreme = 7;
-        minFlat = 16;
+        minFlat = 13;
+        minActivePower = 80;
+        minReactivePower = 90;
         break;
 
     default:
@@ -262,7 +265,7 @@ int isChargingDevice(float *cur, int curStart, float *vol, int volStart, float *
 
     deltaActivePower =
             deltaActivePower >= 0 ? deltaActivePower : calActivePower(cur, curStart, vol, volStart, 128);
-    if (deltaActivePower < 80 || deltaActivePower > 280 || pulseI < pulseIThresh
+    if (deltaActivePower < minActivePower || deltaActivePower > 280 || pulseI < pulseIThresh
             || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1) {
         if (errMsg != NULL) {
             sprintf(errMsg, "da=%.0f pi=%.1f fr=%.2f", deltaActivePower, pulseI,
@@ -276,7 +279,7 @@ int isChargingDevice(float *cur, int curStart, float *vol, int volStart, float *
     float reactivePower = getReactivePowerByS(deltaActivePower, deltaEffI * deltaEffU);
 
     //无功功率判断
-    if (reactivePower < 100) {
+    if (reactivePower < minReactivePower) {
         if (errMsg != NULL) {
             sprintf(errMsg, "rp=%.0f", reactivePower);
         }
@@ -312,13 +315,15 @@ int isChargingDevice(float *cur, int curStart, float *vol, int volStart, float *
     int checkPass = 1;
     switch (gMode) {
     case CHARGING_ALARM_SENSITIVITY_HIGH:
+        checkPass = 1;
+        break;
     case CHARGING_ALARM_SENSITIVITY_MEDIUM:
         if ((cwf.maxRightNum + cwf.maxLeftNum <= 3) || (cwf.minRightNum + cwf.minLeftNum <= 3)
                 || (cwf.maxLeftNum >= cwf.maxRightNum && cwf.minLeftNum >= cwf.minRightNum)) {
             checkPass = 0;
         }
         break;
-    case CHARGING_ALARM_SENSITIVITY_LOW://低灵敏度
+    case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
         if (cwf.maxRightNum < 3 || cwf.minRightNum < 3 || cwf.maxLeftNum > 1 || cwf.minLeftNum > 1) {
             checkPass = 0;
         }
