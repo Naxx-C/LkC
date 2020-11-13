@@ -16,14 +16,14 @@ const static char VERSION[] = { 1, 0, 0, 0 };
 #define EFF_BUFF_NUM (50 * 3) // effective current buffer NUM
 static float gActivePBuff[EFF_BUFF_NUM];
 
-#define BUFF_NUM 512
-static float gIBuff[BUFF_NUM]; // FIFO buff, pos0是最老的数据
-static float gUBuff[BUFF_NUM];
-static float gLastStableIBuff[BUFF_NUM];
-static float gLastStableUBuff[BUFF_NUM];
+#define WAVE_BUFF_NUM 512
+static float gIBuff[WAVE_BUFF_NUM]; // FIFO buff, pos0是最老的数据
+static float gUBuff[WAVE_BUFF_NUM];
+static float gLastStableIBuff[WAVE_BUFF_NUM];
+static float gLastStableUBuff[WAVE_BUFF_NUM];
 static float gLastStableIEff = 0;
 static float gLastStableUEff = 0;
-static float gDeltaIBuff[BUFF_NUM];
+static float gDeltaIBuff[WAVE_BUFF_NUM];
 
 static int gLastStable = 1; // 上个周期的稳态情况
 
@@ -82,12 +82,12 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
     // global timer
     gUtcTime = utcTime;
 
-    if (length > BUFF_NUM || BUFF_NUM % length != 0) {
+    if (length > WAVE_BUFF_NUM || WAVE_BUFF_NUM % length != 0) {
         return -2;
     }
 
-    insertFifoBuff(gIBuff, BUFF_NUM, current, length);
-    insertFifoBuff(gUBuff, BUFF_NUM, voltage, length);
+    insertFifoBuff(gIBuff, WAVE_BUFF_NUM, current, length);
+    insertFifoBuff(gUBuff, WAVE_BUFF_NUM, voltage, length);
 
     //首先更新功耗数据
     updatePowercost(utcTime, &gTotalPowerCost, gLastActivePower);
@@ -117,8 +117,8 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
                         > gNilmMinEventStep) {
 
             // 计算差分电流
-            int zero1 = zeroCrossPoint(gLastStableUBuff, 0, 128);
-            int zero2 = zeroCrossPoint(gUBuff, 0, 128);
+            int zero1 = zeroCrossPoint(gLastStableUBuff, 0, 256);
+            int zero2 = zeroCrossPoint(gUBuff, 0, 256);
 
             for (int i = 0; i < 128; i++) {
                 gDeltaIBuff[i] = gIBuff[zero2 + i] - gLastStableIBuff[zero1 + i];
@@ -354,7 +354,7 @@ int nilmAnalyze(float current[], float voltage[], int length, int utcTime, float
         powerCheck(activePower);
 
         // 稳态窗口的变量赋值和状态刷新
-        for (int i = 0; i < BUFF_NUM; i++) {
+        for (int i = 0; i < WAVE_BUFF_NUM; i++) {
             gLastStableIBuff[i] = gIBuff[i];
             gLastStableUBuff[i] = gUBuff[i];
         }

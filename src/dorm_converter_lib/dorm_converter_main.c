@@ -8,8 +8,9 @@
 #include <time.h>
 #include <math.h>
 #include <unistd.h>
-#include "charging_alarm_algo.h"
 #include "fft.h"
+
+#include "dorm_converter_algo.h"
 
 #define EFF_BUFF_NUM (50 * 1) // effective current buffer NUM
 static float gActivePBuff[EFF_BUFF_NUM];
@@ -115,6 +116,10 @@ static int isPowerStable(float inputs[], int len, float absThresh, int relativeR
     return 1;
 }
 
+#define FOOTPRINT_SIZE 10 // 1s采样一次，1个小时的数据
+static PowerShaft gPowerShaft[FOOTPRINT_SIZE]; //存储电能足迹
+static int gPowerShaftSize = 0;
+
 static int gTimer = 0;
 // 20ms调用一次
 static int stableAnalyze(float current[], float voltage[], int length, float effCurrent, float effVoltage,
@@ -133,6 +138,8 @@ static int stableAnalyze(float current[], float voltage[], int length, float eff
     float effI = effCurrent >= 0 ? effCurrent : getEffectiveValue(current, 0, length);
     float effU = effVoltage >= 0 ? effVoltage : getEffectiveValue(voltage, 0, length);
 
+    float reactivePower = sqrtf(effI * effI * effU * effU - activePower * activePower);
+
     insertFifoBuffOne(gActivePBuff, EFF_BUFF_NUM, activePower);
     int isStable = isPowerStable(gActivePBuff, EFF_BUFF_NUM, 15, 1);
 
@@ -140,7 +147,41 @@ static int stableAnalyze(float current[], float voltage[], int length, float eff
         printf(">>>gTimer=%d stable status change, stable=%d activePower=%.2f\n", gTimer, isStable,
                 activePower);
     }
-    // 稳态
+
+    //无功缓慢上升检测
+    if (gTimer % 50 == 0) {
+        PowerShaft powerShaft;
+        powerShaft.activePower = activePower;
+        powerShaft.reactivePower = reactivePower;
+        insertFifoCommon((char*) gPowerShaft, sizeof(gPowerShaft), (char*) (&powerShaft), sizeof(powerShaft));
+        if (gPowerShaftSize < FOOTPRINT_SIZE) {
+            gPowerShaftSize++;
+        }
+        // 已存满
+        int riseCounter = -1;
+        if (gPowerShaftSize >= FOOTPRINT_SIZE) {
+            for (int i = 0; i < FOOTPRINT_SIZE - 1; i++) {
+                if (gPowerShaft[i].reactivePower < gPowerShaft[i + 1].reactivePower
+                        && gPowerShaft[i].activePower < gPowerShaft[i + 1].activePower) {
+                    riseCounter++;
+                } else {
+                    riseCounter = 0;
+                }
+            }
+        }
+        if (riseCounter >= FOOTPRINT_SIZE / 2) {
+            int zero2 = zeroCrossPoint(gUBuff, 0, 128);
+            DormWaveFeature cwf;
+            getDormWaveFeature(gIBuff, zero2, gUBuff, zero2, effI, effU, activePower, &cwf);
+
+            if (cwf.flatNum >= 14 && cwf.maxDelta / (cwf.maxValue + 0.0001f) >= 0.8f && activePower >= 150
+                    && reactivePower >= 150 && cwf.extremeNum >= 2 && cwf.extremeNum <= 3) {
+                printf("dorm slowly changed\n");
+            }
+        }
+    }
+
+    // 稳态差分检测
     if (isStable > 0) {
 
         //投切事件发生
@@ -151,8 +192,8 @@ static int stableAnalyze(float current[], float voltage[], int length, float eff
                         > 85) {
 
             // 计算差分电流
-            int zero1 = zeroCrossPoint(gLastStableUBuff, 0, 256);
-            int zero2 = zeroCrossPoint(gUBuff, 0, 256);
+            int zero1 = zeroCrossPoint(gLastStableUBuff, 0, 128);
+            int zero2 = zeroCrossPoint(gUBuff, 0, 128);
 
             for (int i = 0; i < 128; i++) {
                 gDeltaIBuff[i] = gIBuff[zero2 + i] - gLastStableIBuff[zero1 + i];
@@ -173,11 +214,10 @@ static int stableAnalyze(float current[], float voltage[], int length, float eff
             // feature4:
             float iPulse = (gTransitTmpIMax - gLastStableIEff) / (effI - gLastStableIEff);
 
-            printf("feature: deltaActivePower=%.2f iPulse=%.2f\n", deltaActivePower, iPulse);
             char errMsg[50];
             memset(errMsg, 0, sizeof(errMsg));
 
-            int iscd = isChargingDevice(gDeltaIBuff, 0, gUBuff, zero2, oddFft, iPulse, deltaEffI, deltaEffU,
+            int iscd = isDormConverter(gDeltaIBuff, 0, gUBuff, zero2, deltaEffI, deltaEffU,
                     deltaActivePower, errMsg);
             printf("%d errMsg:%s\n", iscd, errMsg != NULL ? errMsg : "ok");
             gLastProcessedStableActivePower = activePower;
@@ -208,12 +248,12 @@ static int stableAnalyze(float current[], float voltage[], int length, float eff
     return 0;
 }
 
-//static char *dirPath = "F:\\Tmp\\tiaoya";
-static char *dirPath = "F:\\Tmp\\charging_yes";
-int charging_alarm_main() {
+static char *dirPath = "F:\\Tmp\\tiaoya";
+//static char *dirPath = "F:\\Tmp\\nilm";
+int dorm_converter_main() {
 
-    int ret = chargingAlarmAlgoinit();
-    setMode(CHARGING_ALARM_SENSITIVITY_MEDIUM);
+    int ret = dormConverterAlgoInit();
+    setDormConverterMode(DORM_CONVERTER_SENSITIVITY_MEDIUM);
     if (ret != 0) {
         printf("some error\n");
         return -1;
@@ -230,9 +270,9 @@ int charging_alarm_main() {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0
                     || !endWith(entry->d_name, ".csv")) //|| !startWith(entry->d_name, "0")) ///current dir OR parrent dir
                 continue;
-            int convertHardcode = 1;
+            int convertHardcode = 1; //TODO:注意单相电抓的数据是反的
             if (startWith(entry->d_name, "elec_"))
-                convertHardcode = -1;//TODO:11月之前的，单相电抓的数据是反的,需要-1
+                convertHardcode = 1;
 
             fileIndex = 0;
             memset(csv, 0, sizeof(csv));

@@ -197,9 +197,11 @@ void updatePowercost(int utcTime, float *totalPowerCost, float lastUpdatedActive
             OnlineAppliance *o = &(gOnlineList[i]);
 //            o->powerCost += o->estimatedActivePower / 1000 * (utcTime - gLastPowercostUpdateTime);
             o->powerCost += o->activePower / 1000 * (utcTime - gLastPowercostUpdateTime);
+            gLastPowercostUpdateTime = utcTime;
         }
+    } else if (timeDelta > 30) {
+        gLastPowercostUpdateTime = utcTime;
     }
-    gLastPowercostUpdateTime = utcTime;
 }
 
 //清空在线列表

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include "dirent.h"
 #include <string.h>
 #include <time.h>
@@ -31,10 +32,10 @@ void f(TestB *testB) {
 //float Microwave[8] = { 3.08, 0.97, 0.29, 0.11, 0.06, 0.87, 1.27, 933.31 };
 //float Microwave2[8] = { 1.85, 1.00, 0.35, 0.04, 0.05, 0.31, 3.05, 202.64 };
 
-float Cleaner1[8] = { 3.400, 2.600, 1.400, 0.700, 0.500, 0.550, 4.300, 382.300};
-float Cleaner2[8] = {6.700, 1.000, 0.300, 0.100, 0.100, 0.990, 7.100, 1028.400};
-float Cleaner3[8] = {3.900, 2.900, 1.400, 0.700, 0.400, 0.530, 3.800, 418.500};
-float Cleaner4[8] = {7.800, 1.400, 0.300, 0.100, 0.100, 0.980, 5.600, 1198.000};
+float Cleaner1[8] = { 3.400, 2.600, 1.400, 0.700, 0.500, 0.550, 4.300, 382.300 };
+float Cleaner2[8] = { 6.700, 1.000, 0.300, 0.100, 0.100, 0.990, 7.100, 1028.400 };
+float Cleaner3[8] = { 3.900, 2.900, 1.400, 0.700, 0.400, 0.530, 3.800, 418.500 };
+float Cleaner4[8] = { 7.800, 1.400, 0.300, 0.100, 0.100, 0.980, 5.600, 1198.000 };
 extern NilmAppliance gNilmAppliances[100];
 
 #define MAX_ID_MAP 10
@@ -55,9 +56,9 @@ void setFakeValue(float data[128], float val) {
 #pragma pack(1)
 
 typedef struct {
-    signed char id;                       //ID号
-    char name[16];                      //电器名称
-    float oddFft[5];    //特征参数
+    signed char id; //ID号
+    char name[16]; //电器名称
+    float oddFft[5]; //特征参数
     float powerFactor;
     float pulseI;
     float activePower;
@@ -89,16 +90,108 @@ typedef struct {
 
 TEST test[3];
 
-
 int x921[3];
-void getX(int **y){
-    *y= x921;
+void getX(int **y) {
+    *y = x921;
 }
 
 const char *APP_BUILD_DATE = __DATE__;
 int main() {
 
-    charging_alarm_main();
+    algo_set_test();
+//    charging_alarm_main();
+//    dorm_converter_main();
+    return 0;
+    time_t t;
+
+    t=time(NULL);
+
+    printf("The number of seconds since January 1, 1970 is  %d\n",t);
+    printf("%d %d\n",sizeof(long long),sizeof(int));
+//    charging_alarm_main();
+//    dorm_converter_main();
+
+    float cur[128] = { 0.29296875, 0, 0.341796875, 0.341796875, 0.1953125, 0.244140625, 0.1953125,
+            0.146484375, 0.09765625, 0.146484375, 0, 0, 0.29296875, -0.048828125, 0.048828125, 0.29296875,
+            0.29296875, 0.341796875, 0.1953125, 0.390625, 1.22070313, 1.66015625, 2.44140625, 2.734375,
+            3.07617188, 2.34375, 2.88085938, 1.85546875, 2.19726563, 1.26953125, 0.9765625, 2.34375,
+            1.70898438, 1.61132813, 0.68359375, 0.634765625, 0.48828125, 0.1953125, 0.390625, 0.146484375, 0,
+            -0.048828125, 0.244140625, 0.146484375, 0.341796875, -0.09765625, 0, -0.048828125, 0.1953125,
+            0.341796875, -0.048828125, -0.244140625, 0.29296875, -0.48828125, -0.244140625, -0.146484375, 0,
+            -0.048828125, 0.048828125, -0.048828125, -0.09765625, -0.09765625, -0.09765625, -0.048828125,
+            -0.048828125, -0.146484375, -0.048828125, -0.146484375, -0.09765625, 0, -0.09765625, -0.09765625,
+            -0.048828125, 0.048828125, 0.244140625, 0.1953125, -0.146484375, -0.390625, -0.68359375,
+            0.146484375, 0.048828125, -0.29296875, -0.09765625, -0.048828125, -0.9765625, -1.7578125,
+            -2.09960938, -2.734375, -2.63671875, -2.34375, -1.85546875, -2.09960938, -1.90429688, -0.390625,
+            -0.87890625, -1.3671875, -0.09765625, -0.87890625, 0.830078125, -0.634765625, -0.29296875,
+            -0.78125, 0.48828125, 0.732421875, -0.048828125, 0.09765625, 0.09765625, -0.09765625, 0.048828125,
+            -0.146484375, -0.09765625, 0.048828125, -0.09765625, -0.09765625, -0.146484375, 0.048828125,
+            -0.09765625, -0.09765625, 0, -0.146484375, 0, -0.048828125, -0.048828125, -0.09765625, 0.09765625,
+            -0.048828125, -0.09765625, 0.048828125 };
+    int BATCH = 4, curStart = 0;
+    float max = -999, min = 999;
+    int maxIndex = 0, minIndex = 0;
+    float c[33]; // 扩充1位
+    memset(&c, 0, sizeof(c));
+    for (int i = 0; i < 128; i += BATCH) {
+        for (int j = 0; j < BATCH; j++) {
+            c[i / BATCH] += cur[curStart + i + j] / BATCH;
+        }
+        if (c[i / BATCH] > max) {
+            max = c[i / BATCH];
+            maxIndex = i / BATCH;
+        } else if (c[i / BATCH] < min) {
+            min = c[i / BATCH];
+            minIndex = i / BATCH;
+        }
+    }
+    c[32] = c[0];
+    float ad = 0, delta, average = 0;
+    for (int i = 1; i < 33; i++) {
+        delta = (float) (c[i] - c[i - 1]);
+        delta = delta > 0 ? delta : -delta;
+        ad += delta;
+        if (c[i] > max)
+            max = c[i];
+    }
+    ad /= 32;
+
+    for (int i = 0; i < 32; i++) {
+        average += c[i];
+        printf("%.2f\t", c[i]);
+    }
+    printf("\n");
+    average /= 32;
+    int direction = 0, extremeNum = 0, flatNum = 0, flatBitmap = 0;
+    float valueThresh = max / 9, deltaThresh = ad / 2;
+    for (int i = 0; i < 32; i++) {
+        // 周边至少一个点也是平肩
+        if ((i >= 1 && fabs(c[i]) < valueThresh && fabs(c[i - 1]) < valueThresh
+                && fabs(c[i] - c[i - 1]) < deltaThresh)
+                || (i <= 31 && fabs(c[i]) < valueThresh && fabs(c[i + 1]) < valueThresh
+                        && fabs(c[i + 1] - c[i]) < deltaThresh)) {
+            flatNum++;
+            flatBitmap = flatBitmap | (0x1 << i);
+            printf("%d ", i);
+        }
+    }
+    // 极值点个数.极值点非平肩,平肩不切换方向
+    for (int i = 0; i < 32; i++) {
+        if (c[i + 1] - c[i] > 0 && (flatBitmap & ((0x1 << (i + 1)) | (0x1 << i))) == 0) {
+            if (direction < 0) {
+                extremeNum++;
+                printf("\next:%d", i);
+            }
+            direction = 1;
+        } else if (c[i + 1] - c[i] < 0 && (flatBitmap & ((0x1 << (i + 1)) | (0x1 << i))) == 0) {
+            if (direction > 0) {
+                extremeNum++;
+                printf("\next:%d", i);
+            }
+            direction = -1;
+        }
+    }
+    printf("\n%d %d\n", extremeNum, flatNum);
 
 //    printf("%d\n",getCurTime());
 //    nilm_main();

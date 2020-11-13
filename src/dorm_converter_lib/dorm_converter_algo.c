@@ -1,22 +1,12 @@
-#include "charging_alarm_algo.h"
+#include "dorm_converter_algo.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 #define PI 3.14159265f
 const static char VERSION[] = { 1, 0, 0, 1 };
 
-typedef struct {
-    int flatNum; //平肩数目
-    int extremeNum; //极值点数目
-    int maxLeftNum; //极值点左右的点数
-    int maxRightNum;
-    int minLeftNum;
-    int minRightNum;
-    float maxDelta;
-    float maxValue;
-} ChargingWaveFeature;
-
-static int gMode = CHARGING_ALARM_SENSITIVITY_MEDIUM;
+static int gMode = DORM_CONVERTER_SENSITIVITY_MEDIUM;
 
 static char gIsLibExpired = 1;
 // prebuiltDate sample "Mar 03 2020"
@@ -45,36 +35,6 @@ static int isExpired(const char *prebuiltDate, const char *expiredDate) {
     return score < 0;
 }
 
-static float chargers[][5] = { { 1.24, 0.89, 0.413, 0.24, 0.321 }, //wangao
-        { 1.272, 0.990, 0.652, 0.403, 0.297 }, { 1.302, 1.032, 0.618, 0.385, 0.337 }, { 1.268, 1.037, 0.663,
-                0.390, 0.323 }, //200w
-        { 0.721, 0.587, 0.399, 0.265, 0.238 }, { 0.731, 0.625, 0.400, 0.269, 0.209 }, //100w
-//        {0.26466367,0.22620744,0.19432415,0.13409556,0.099954225},//误报
-//        { 3.38, 0.467, 0.124, 0.291, 0.133 }, { 0.514, 0.052, 0.038, 0.008, 0 }, { 0.815, 0.627, 0.352, 0.108,
-//                0.067 }, { 1.14, 0.63, 0.35, 0.1, 0.06 }, { 0.868, 0.774, 0.607, 0.399, 0.201 } //test
-        };
-
-static float calCosineSimilarity(float a[], float b[], int start, int len) {
-    if (a == NULL || b == NULL) {
-        return -1;
-    }
-
-    float numerator = 0;
-    float denominatorA = 0;
-    float denominatorB = 0;
-    int end = start + len;
-    for (int i = start; i < end; i++) {
-        numerator += a[i] * b[i];
-        denominatorA += a[i] * a[i];
-        denominatorB += b[i] * b[i];
-    }
-
-    float cosine = (numerator / (sqrt(denominatorA) * sqrt(denominatorB)));
-
-    float cosineSimilarity = (float) (acos(cosine) * 180 / PI);
-    return cosineSimilarity;
-}
-
 /**
  * 有效值
  */
@@ -90,7 +50,7 @@ static float calEffectiveValue(float inputs[], int start, int len) {
 /**
  * 有功功率，可正可负
  */
-float calActivePower(float current[], int indexI, float voltage[], int indexU, int len) {
+static float calActivePower(float current[], int indexI, float voltage[], int indexU, int len) {
 
     float activePower = 0;
     for (int i = 0; i < len; i++) {
@@ -101,15 +61,15 @@ float calActivePower(float current[], int indexI, float voltage[], int indexU, i
 }
 
 //通过视在功率计算无功功率
-float getReactivePowerByS(float activePower, float apparentPower) {
+static float getReactivePowerByS(float activePower, float apparentPower) {
 
     float reactivePower = sqrtf(apparentPower * apparentPower - activePower * activePower);
     return reactivePower;
 }
 
 #define BATCH 4
-int getWaveFeature(float *cur, int curStart, float *vol, int volStart, float effI, float effU,
-        float deltaActivePower, ChargingWaveFeature *cwf) {
+int getDormWaveFeature(float *cur, int curStart, float *vol, int volStart, float effI, float effU,
+        float deltaActivePower, DormWaveFeature *cwf) {
 
     if (cwf == NULL || cur == NULL || vol == NULL)
         return -1;
@@ -239,94 +199,71 @@ int getWaveFeature(float *cur, int curStart, float *vol, int volStart, float eff
  * deltaEffU:差分有效电压
  * deltaActivePower:差分有功功率
  */
-int isChargingDevice(float *cur, int curStart, float *vol, int volStart, float *fft, float pulseI,
-        float deltaEffI, float deltaEffU, float deltaActivePower, char *errMsg) {
+int isDormConverter(float *cur, int curStart, float *vol, int volStart, float deltaEffI, float deltaEffU,
+        float deltaActivePower, char *errMsg) {
 
     if (gIsLibExpired)
         return 0;
 
-    float pulseIThresh = 1.5f;
-    float thetaThresh = 13;
-    int minExtreme = 2, maxExtreme = 2;
-    int minFlat = 18;
-    float minActivePower = 85, minReactivePower = 100;
-    float maxDeltaRatio = 0.8f;
+    int minExtreme = 2, maxExtreme = 3;
+    int minFlat = 14;
+    float minActivePower = 100, minReactivePower = 100;
+    float minDeltaRatio = 0.8f;
 
     switch (gMode) {
-    case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
-        pulseIThresh = 3.0f; //越大越严
-        thetaThresh = 10; //越小越严
-        maxExtreme = 7; //越小越严
-        minFlat = 18; //越大越严
-        minActivePower = 100; //越大越严
+    case DORM_CONVERTER_SENSITIVITY_LOW: //低灵敏度
+        minExtreme = 2;//越大越严
+        maxExtreme = 2;//越小越严
+        minFlat = 16;//越大越严
+        minActivePower = 130; //越大越严
         minReactivePower = 100; //越大越严
-        maxDeltaRatio = 0.75f; //越小越严
+        minDeltaRatio = 0.9f; //越大越严
         break;
-    case CHARGING_ALARM_SENSITIVITY_MEDIUM:
-        pulseIThresh = 1.5f;
-        thetaThresh = 13;
-        maxExtreme = 7;
-        minFlat = 16;
-        minActivePower = 90;
-        minReactivePower = 100;
-        maxDeltaRatio = 0.8f;
+    case DORM_CONVERTER_SENSITIVITY_MEDIUM:
+        minExtreme = 2;
+        maxExtreme = 3;
+        minFlat = 12;
+        minActivePower = 100;
+        minReactivePower = 80;
+        minDeltaRatio = 0.8f;
         break;
-    case CHARGING_ALARM_SENSITIVITY_HIGH: //高灵敏度
-        pulseIThresh = 0.0f;
-        thetaThresh = 15;
-        maxExtreme = 7;
-        minFlat = 13;
-        minActivePower = 80;
-        minReactivePower = 90;
-        maxDeltaRatio = 0.9f;
+    case DORM_CONVERTER_SENSITIVITY_HIGH: //高灵敏度
+        minExtreme = 2;
+        maxExtreme = 4;
+        minFlat = 10;
+        minActivePower = 100;
+        minReactivePower = 50;
+        minDeltaRatio = 0.7f;
         break;
 
     default:
         break;
-
     }
 
     deltaActivePower =
             deltaActivePower >= 0 ? deltaActivePower : calActivePower(cur, curStart, vol, volStart, 128);
-    if (deltaActivePower < minActivePower || deltaActivePower > 280 || pulseI < pulseIThresh
-            || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1) {
+    if (deltaActivePower < minActivePower) {
         if (errMsg != NULL) {
-            sprintf(errMsg, "da=%.0f pi=%.1f fr=%.2f", deltaActivePower, pulseI,
-                    (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f));
+            sprintf(errMsg, "da=%.0f", deltaActivePower);
         }
         return 0;
     }
 
     deltaEffI = deltaEffI >= 0 ? deltaEffI : calEffectiveValue(cur, curStart, 128);
     deltaEffU = deltaEffU >= 0 ? deltaEffU : calEffectiveValue(vol, volStart, 128);
-    float reactivePower = getReactivePowerByS(deltaActivePower, deltaEffI * deltaEffU);
+    float deltaReactivePower = getReactivePowerByS(deltaActivePower, deltaEffI * deltaEffU);
 
     //无功功率判断
-    if (reactivePower < minReactivePower) {
+    if (deltaReactivePower < minReactivePower) {
         if (errMsg != NULL) {
-            sprintf(errMsg, "rp=%.0f", reactivePower);
+            sprintf(errMsg, "rp=%.0f", deltaReactivePower);
         }
         return 0;
     }
 
-    //余弦相似度
-    float minTheta = 180;
-    for (int i = 0; i < sizeof(chargers) / 20; i++) {
-        float theta = calCosineSimilarity(chargers[i], fft, 0, 5);
-        if (theta < minTheta) {
-            minTheta = theta;
-        }
-    }
-    if (minTheta > thetaThresh) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "th=%.1f", minTheta);
-        }
-        return 0;
-    }
-
-    ChargingWaveFeature cwf;
+    DormWaveFeature cwf;
     memset(&cwf, 0, sizeof(cwf));
-    int wf = getWaveFeature(cur, curStart, vol, volStart, deltaEffI, deltaEffU, deltaActivePower, &cwf);
+    int wf = getDormWaveFeature(cur, curStart, vol, volStart, deltaEffI, deltaEffU, deltaActivePower, &cwf);
     if (wf < 0 || cwf.flatNum < minFlat || cwf.extremeNum < minExtreme || cwf.extremeNum > maxExtreme) {
         if (errMsg != NULL) {
             sprintf(errMsg, "fn=%d en=%d", cwf.flatNum, cwf.extremeNum);
@@ -335,90 +272,39 @@ int isChargingDevice(float *cur, int curStart, float *vol, int volStart, float *
     }
 
     //排除斩波电路干扰. 斩波会从平肩直接跳变到最大值，充电会有个上升过程
-    if (cwf.maxDelta >= cwf.maxValue * maxDeltaRatio) {
+    if (cwf.maxDelta < cwf.maxValue * minDeltaRatio) {
         if (errMsg != NULL) {
             sprintf(errMsg, "mad=%.2f mav=%.2f", cwf.maxDelta, cwf.maxValue);
         }
         return 0;
     }
-
-    //极值点左右点数
-    int checkPass = 1;
-    switch (gMode) {
-    case CHARGING_ALARM_SENSITIVITY_HIGH:
-        checkPass = 1;
-        break;
-    case CHARGING_ALARM_SENSITIVITY_MEDIUM:
-        if (cwf.maxLeftNum >= cwf.maxRightNum || cwf.minLeftNum >= cwf.minRightNum) {
-            checkPass = 0;
-        }
-        break;
-    case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
-        if (cwf.maxLeftNum >= cwf.maxRightNum || cwf.minLeftNum >= cwf.minRightNum) {
-            checkPass = 0;
-        }
-        break;
-    default:
-        break;
-    }
-    if (checkPass == 0) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "near=%d %d %d %d", cwf.maxLeftNum, cwf.maxRightNum, cwf.minLeftNum,
-                    cwf.minRightNum);
-        }
-        return 0;
-    }
-
     if (errMsg != NULL) {
-        sprintf(errMsg, "charging detected fn=%d en=%d", cwf.flatNum, cwf.extremeNum);
+        sprintf(errMsg, "dorm converter detected");
     }
     return 1;
 }
 
 static const int MODE_MAX = 2;
-void setMode(int mode) {
+void setDormConverterMode(int mode) {
     if (mode >= -1 && mode <= MODE_MAX) {
         gMode = mode;
     }
 }
 
-int getMode(void) {
+int getDormConverterMode(void) {
     return gMode;
 }
 
-int getChargingAlarmAlgoVersion(void) {
+int getDormConverterAlgoVersion(void) {
     return VERSION[0] << 24 | VERSION[1] << 16 | VERSION[2] << 8 | VERSION[3];
-}
-
-int charging_alarm_main2(void) {
-
-    for (int i = 0; i < sizeof(chargers) / 20; i++)
-        for (int j = 0; j < sizeof(chargers) / 20; j++) {
-
-            float s = calCosineSimilarity(chargers[i], chargers[j], 0, 5);
-            printf("n=%d %dvs%d: theta=%.2f\n", sizeof(chargers) / 20, i, j, s);
-        }
-//    float fft[5] = { 0.731, 0.625, 0.400, 0.269, 0.209 };
-//    float pulseI = 1.9;
-//    float deltaEffI = 1;
-//    float deltaEffU = 220;
-//    float deltaActivePower = 100;
-//    chargingAlarmAlgoinit();
-//    char errMsg[50];
-//    memset(errMsg, 0, sizeof(errMsg));
-//    int iscd = isChargingDevice(NULL, 0, NULL, 0, fft, pulseI, deltaEffI, deltaEffU, deltaActivePower,
-//            errMsg);
-//
-//    printf("%d errMsg:%s\n", iscd, errMsg != NULL ? errMsg : "ok");
-    return 0;
 }
 
 extern char *APP_BUILD_DATE;
 static const char *EXPIRED_DATE = "2021-06-30";
-int chargingAlarmAlgoinit() {
+int dormConverterAlgoInit() {
     gIsLibExpired = isExpired(APP_BUILD_DATE, EXPIRED_DATE);
     if (gIsLibExpired) {
-        setMode(CHARGING_ALARM_DISABLED);
+        setDormConverterMode(DORM_CONVERTER_DISABLED);
         return 1;
     }
     return 0;
