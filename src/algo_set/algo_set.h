@@ -18,5 +18,9 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
 int initTpsonAlgoLib();
 
 void setMinEventDeltaPower(float minEventDeltaPower);
+void setMinChargingDevicePower(float power);
+void setMaxChargingDevicePower(float power);
+void setMinDormConverterPower(float power);
+void setMaxDormConverterPower(float power);
 
 #endif /* ALGO_SET_ALGO_SET_H_ */

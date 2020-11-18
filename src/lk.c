@@ -8,6 +8,7 @@
 #include "nilm_algo.h"
 #include "nilm_idmap.h"
 #include "nilm_onlinelist.h"
+#include "time_utils.h"
 #include <sys/time.h>
 
 extern int arcfault_main();
@@ -99,15 +100,8 @@ const char *APP_BUILD_DATE = __DATE__;
 int main() {
 
     algo_set_test();
-//    charging_alarm_main();
-//    dorm_converter_main();
     return 0;
-    time_t t;
 
-    t=time(NULL);
-
-    printf("The number of seconds since January 1, 1970 is  %d\n",t);
-    printf("%d %d\n",sizeof(long long),sizeof(int));
 //    charging_alarm_main();
 //    dorm_converter_main();
 

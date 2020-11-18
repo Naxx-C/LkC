@@ -13,8 +13,10 @@
 #ifdef _WIN32
 #endif
 
-static char *dirPath = "F:\\Tmp\\tiaoya";
+//static char *dirPath = "F:\\Tmp\\tiaoya";
 //static char *dirPath = "F:\\Tmp\\charging_yes";
+//static char *dirPath = "F:\\Tmp\\maliload";
+static char *dirPath = "F:\\Tmp\\dingpinkongtiao";
 
 static int init(){
 

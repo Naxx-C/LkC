@@ -5,12 +5,22 @@
 #include <math.h>
 
 static int gMode = DORM_CONVERTER_SENSITIVITY_MEDIUM;
+static float gPresetMinPower = -1;
+static float gPresetMaxPower = -1;
+
+void setMinDormConverterPower(float power) {
+    gPresetMinPower = power;
+
+}
+void setMaxDormConverterPower(float power) {
+    gPresetMaxPower = power;
+}
 
 //调压器调整过程中监测
 int dormConverterAdjustingCheck(float activePower, float reactivePower, WaveFeature *wf, char *errMsg) {
     int minExtreme = 2, maxExtreme = 3;
     int minFlat = 14;
-    float minActivePower = 150, minReactivePower = 150;
+    float minActivePower = 150, minReactivePower = 150, maxActivePower = 3000;
     float minDeltaRatio = 0.8f;
 
     switch (gMode) {
@@ -42,9 +52,19 @@ int dormConverterAdjustingCheck(float activePower, float reactivePower, WaveFeat
     default:
         break;
     }
+
+    //功率阈值,手动配置更新
+    if (gPresetMinPower > 0) {
+        minActivePower = gPresetMinPower;
+    }
+    if (gPresetMaxPower > 0) {
+        maxActivePower = gPresetMaxPower;
+    }
+
     if (wf->flatNum >= minFlat && wf->maxDelta >= wf->maxValue * minDeltaRatio
-            && activePower >= minActivePower && reactivePower >= minReactivePower
-            && wf->extremeNum >= minExtreme && wf->extremeNum <= maxExtreme) {
+            && activePower >= minActivePower && activePower <= maxActivePower
+            && reactivePower >= minReactivePower && wf->extremeNum >= minExtreme
+            && wf->extremeNum <= maxExtreme) {
         return 1;
     }
     return 0;

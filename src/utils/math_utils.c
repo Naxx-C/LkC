@@ -22,3 +22,27 @@ float getCosineSimilarity(float a[], float b[], int start, int len) {
     float cosineSimilarity = (float) (acos(cosine) * 180 / PI);
     return cosineSimilarity;
 }
+
+float getAverageValue(float *data, int len) {
+    float sum = 0;
+    for (int i = 0; i < len; i++)
+        sum += data[i];
+
+    return sum / len;
+}
+
+
+float getThreshAverage(float *data, int len, float thresh) {
+
+    float sum = 0;
+    int counter = 0;
+    for (int i = 0; i < len; i++) {
+        if (data[i] > thresh) {
+            sum += data[i];
+            counter++;
+        }
+    }
+    if (counter == 0)
+        return 0;
+    return sum / counter;
+}

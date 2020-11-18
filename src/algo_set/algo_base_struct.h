@@ -4,6 +4,7 @@
  */
 #ifndef ALGO_BASE_STRUCT_H_
 #define ALGO_BASE_STRUCT_H_
+#define LF 0.0001f //little float. 小值,防止分母为0
 
 typedef struct {
     int flatNum; //平肩数目

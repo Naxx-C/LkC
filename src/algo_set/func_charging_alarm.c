@@ -7,6 +7,16 @@
 #include <math.h>
 
 static int gMode = CHARGING_ALARM_SENSITIVITY_MEDIUM;
+static float gPresetMinPower = -1;//-1表示未配置
+static float gPresetMaxPower = -1;
+
+void setMinChargingDevicePower(float power) {
+    gPresetMinPower = power;
+
+}
+void setMaxChargingDevicePower(float power) {
+    gPresetMaxPower = power;
+}
 
 static float chargers[][5] = { { 1.24, 0.89, 0.413, 0.24, 0.321 }, //wangao
         { 1.272, 0.990, 0.652, 0.403, 0.297 }, { 1.302, 1.032, 0.618, 0.385, 0.337 }, { 1.268, 1.037, 0.663,
@@ -37,7 +47,7 @@ int chargingDetect(float *fft, float pulseI, float deltaActivePower, float delta
     float thetaThresh = 13;
     int minExtreme = 2, maxExtreme = 2;
     int minFlat = 18;
-    float minActivePower = 85, minReactivePower = 100;
+    float minActivePower = 85, minReactivePower = 100, maxActivePower = 280;
     float maxDeltaRatio = 0.8f;
 
     switch (gMode) {
@@ -73,7 +83,15 @@ int chargingDetect(float *fft, float pulseI, float deltaActivePower, float delta
         break;
     }
 
-    if (deltaActivePower < minActivePower || deltaActivePower > 280 || pulseI < pulseIThresh
+    //功率阈值,手动配置更新
+    if (gPresetMinPower > 0) {
+        minActivePower = gPresetMinPower;
+    }
+    if (gPresetMaxPower > 0) {
+        maxActivePower = gPresetMaxPower;
+    }
+
+    if (deltaActivePower < minActivePower || deltaActivePower > maxActivePower || pulseI < pulseIThresh
             || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1) {
         if (errMsg != NULL) {
             sprintf(errMsg, "da=%.0f pi=%.1f fr=%.2f", deltaActivePower, pulseI,

@@ -8,6 +8,7 @@
 #include "algo_base_struct.h"
 #include "func_charging_alarm.h"
 #include "func_dorm_converter.h"
+#include "func_malicious_load.h"
 #include <stdio.h>
 #include <sys/stat.h>
 #include "dirent.h"
@@ -23,9 +24,9 @@
 
 /**固定定义区*/
 #define LOG_ON 1
-#define LF 0.0001f //little float. 小值,防止分母为0
 #define PI 3.14159265f
 const static char VERSION[] = { 1, 0, 0, 1 };
+static const char *EXPIRED_DATE = "2021-06-30";
 
 /**运行变量区*/
 #define WAVE_BUFF_NUM 512
@@ -51,6 +52,8 @@ static char gIsLibExpired = 1;
 
 static int gChargingAlarm = 0;
 static int gDormConverterAlarm = 0;
+static int gDormConverterLastAlarmTime = 0;
+static int gMaliLoadAlarm = 0;
 
 #define SHORT_TRACK_SIZE 10 // 1s采样一次，10s数据
 static PowerTrack gShortPowerTrack[SHORT_TRACK_SIZE]; //存储电能足迹
@@ -71,18 +74,25 @@ void setMinEventDeltaPower(float minEventDeltaPower) {
     gMinEventDeltaPower = minEventDeltaPower;
 }
 
-// 过期判断 prebuiltDate sample "Mar 03 2020"
-// TODO:只接受一定范围内的编译
-static int isExpired(const char *prebuiltDate, const char *expiredDate) {
-    if (prebuiltDate == NULL || expiredDate == NULL)
+// 过期判断
+// prebuiltDate sample "Mar 03 2020" 集成编译库文件的时间
+// startDate 生成库文件的时间
+// expiredDate 认为指定的过期时间
+// TODO:只接受startDate到expiredDate范围内的编译
+static int isExpired(const char *prebuiltDate, const char *startDate, const char *expiredDate) {
+    if (prebuiltDate == NULL || startDate == NULL || expiredDate == NULL)
         return 1;
 
     const static char MONTH_NAME[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
             "Oct", "Nov", "Dec" };
     char monthString[4] = { 0 };
-    int prebuiltYear = 2020, prebuiltMonth = 4, prebuiltDay = 1;
-    int expiredYear = 2020, expiredMonth = 1, expiredDay = 1;
+    int prebuiltYear = 2020, prebuiltMonth = 4, prebuiltDay = 2;
+    int startDateYear = 2020, startDateMonth = 4, startDateDay = 1;
+    //解析prebuiltDate
     sscanf(prebuiltDate, "%s %d %d", monthString, &prebuiltDay, &prebuiltYear);
+    //防止时间是中文系统
+    if (monthString[0] > 'Z' || monthString[0] < 'A')
+        return 1;
 
     for (int i = 0; i < 12; i++) {
         if (strncasecmp(monthString, MONTH_NAME[i], 3) == 0) {
@@ -90,12 +100,33 @@ static int isExpired(const char *prebuiltDate, const char *expiredDate) {
             break;
         }
     }
+    //解析startDate
+    sscanf(startDate, "%s %d %d", monthString, &startDateDay, &startDateYear);
+    //防止时间是中文系统
+    if (monthString[0] > 'Z' || monthString[0] < 'A')
+        return 1;
 
-    sscanf(expiredDate, "%d-%d-%d", &expiredYear, &expiredMonth, &expiredDay);
-    int score = (expiredYear - prebuiltYear) * 31 * 12 + (expiredMonth - prebuiltMonth) * 31
-            + (expiredDay - prebuiltDay);
-    //得分小于0为过期
-    return score < 0;
+    for (int i = 0; i < 12; i++) {
+        if (strncasecmp(monthString, MONTH_NAME[i], 3) == 0) {
+            startDateMonth = i + 1;
+            break;
+        }
+    }
+
+    const static int STR_SIZE = sizeof("2021-06-30");
+    char preBuiltDateString[STR_SIZE];
+    memset(preBuiltDateString, 0, sizeof(preBuiltDateString));
+
+    char startDateString[STR_SIZE];
+    memset(startDateString, 0, sizeof(startDateString));
+
+    sprintf(preBuiltDateString, "%04d-%02d-%02d", prebuiltYear, prebuiltMonth, prebuiltDay);
+    sprintf(startDateString, "%04d-%02d-%02d", startDateYear, startDateMonth, startDateDay);
+
+    if (strcmp(startDateString, preBuiltDateString) <= 0 && strcmp(EXPIRED_DATE, preBuiltDateString) >= 0) {
+        return 0;
+    }
+    return 1;
 }
 
 static float gFft[128] = { 0 }; //全局变量,大内存全局变量防止栈溢出
@@ -274,6 +305,8 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
         return -1;
     }
 
+    DateStruct ds;
+    getDateByTimestamp(date, &ds);
     float effI = getEffectiveValue(cur, curStart, 128); //当前有效电流
     float effU = getEffectiveValue(vol, volStart, 128); //当前有效电压
     float activePower = getActivePower(cur, curStart, vol, volStart, 128); // 当前有功功率
@@ -389,31 +422,37 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
         getCurrentWaveFeature(gDeltaIWaveBuff, 0, gUWaveBuff, zeroCrossThis, deltaEffI, deltaEffU, &deltaWf);
 
         if (LOG_ON) {
-            printf("ext=%d flat=%d iPulse=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f]\n", deltaWf.extremeNum,
-                    deltaWf.flatNum, iPulse, startupTime, deltaActivePower, deltaReactivePower, deltaOddFft[0],
-                    deltaOddFft[1], deltaOddFft[2]);
+            printf("ext=%d flat=%d iPulse=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f]\n",
+                    deltaWf.extremeNum, deltaWf.flatNum, iPulse, startupTime, deltaActivePower,
+                    deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2]);
         }
     }
 
     //step:业务处理
-    //宿舍调压器检测
-
+    //斩波式宿舍调压器检测
     //连续5秒有功和无功都增长
-    if (apRiseCounter >= 5 && rpRiseCounter >= 5) {
+    int dormConverterAlarmTimeDelta = date - gDormConverterLastAlarmTime;
+    if (apRiseCounter >= 5 && rpRiseCounter >= 5 && dormConverterAlarmTimeDelta >= 10) {
         int zeroCross = getZeroCrossIndex(gUWaveBuff, 0, 256);
         WaveFeature cwf;
         getCurrentWaveFeature(gIWaveBuff, zeroCross, gUWaveBuff, zeroCross, effI, effU, &cwf);
         gDormConverterAlarm = dormConverterAdjustingCheck(activePower, reactivePower, &cwf, NULL);
-        if (gDormConverterAlarm && LOG_ON) {
-            printf("gDormConverterAlarm adjusting detected\n");
+        if (gDormConverterAlarm) {
+            if (LOG_ON) {
+                printf("gDormConverterAlarm adjusting detected\n");
+            }
+            gDormConverterLastAlarmTime = date;
         }
     }
 
-    if (switchEventHappen) {
+    if (switchEventHappen && !gDormConverterAlarm && dormConverterAlarmTimeDelta >= 10) {
         gDormConverterAlarm = dormConverterDetect(deltaActivePower, deltaReactivePower, &deltaWf, NULL);
-        if (gDormConverterAlarm && LOG_ON) {
-            printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
-                    deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+        if (gDormConverterAlarm) {
+            if (LOG_ON) {
+                printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
+                        deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+            }
+            gDormConverterLastAlarmTime = date;
         }
     }
 
@@ -421,12 +460,29 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
     if (switchEventHappen) {
         gChargingAlarm = chargingDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, &deltaWf,
         NULL);
-        if (gChargingAlarm && LOG_ON) {
-            printf("gChargingAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
-                    deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+        if (gChargingAlarm) {
+            if (LOG_ON) {
+                printf("gChargingAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
+                        deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+            }
         }
     }
 
+    //恶性负载识别
+    if (switchEventHappen) {
+
+        char msg[50] = { 0 };
+        gMaliLoadAlarm = maliciousLoadDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, effU,
+                activePower, reactivePower, &ds, msg);
+        if (strlen(msg) > 0)
+            printf("msg:%s\n", msg);
+        if (gMaliLoadAlarm) {
+            if (LOG_ON) {
+                printf("gMaliLoadAlarm detected da=%.2f dr=%.2f eu=%.2f\n", deltaActivePower,
+                        deltaReactivePower, effU);
+            }
+        }
+    }
     //nilm
 
     //step:状态和变量更新
@@ -454,11 +510,10 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
 }
 
 extern char *APP_BUILD_DATE;
-static const char *EXPIRED_DATE = "2021-06-30";
 
 int initTpsonAlgoLib() {
 
-    gIsLibExpired = isExpired(APP_BUILD_DATE, EXPIRED_DATE);
+    gIsLibExpired = isExpired(APP_BUILD_DATE, __DATE__, EXPIRED_DATE);
     if (gIsLibExpired) {
         return 1;
     }
@@ -483,6 +538,8 @@ int initTpsonAlgoLib() {
 
     gChargingAlarm = 0;
     gDormConverterAlarm = 0;
+    gDormConverterLastAlarmTime = 0;
+    gMaliLoadAlarm = 0;
 
     memset(gShortPowerTrack, 0, sizeof(gShortPowerTrack));
     gShortTrackNum = 0;
