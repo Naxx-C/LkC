@@ -28,8 +28,8 @@ int dormConverterAdjustingCheck(float activePower, float reactivePower, WaveFeat
         minExtreme = 2; //越大越严
         maxExtreme = 2; //越小越严
         minFlat = 18; //越大越严
-        minActivePower = 100; //越大越严
-        minReactivePower = 100; //越大越严
+        minActivePower = 180; //越大越严
+        minReactivePower = 150; //越大越严
         minDeltaRatio = 0.9f; //越大越严
         break;
     case DORM_CONVERTER_SENSITIVITY_MEDIUM:

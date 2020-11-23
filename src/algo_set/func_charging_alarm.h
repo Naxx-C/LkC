@@ -10,7 +10,6 @@
  */
 int chargingDetect(float *fft, float pulseI,float deltaActivePower, float deltaReactivePower, WaveFeature *wf, char *errMsg);
 
-#define CHARGING_ALARM_DISABLED -1
 #define CHARGING_ALARM_SENSITIVITY_LOW 0
 #define CHARGING_ALARM_SENSITIVITY_MEDIUM 1
 #define CHARGING_ALARM_SENSITIVITY_HIGH 2

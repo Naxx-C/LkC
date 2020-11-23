@@ -64,7 +64,8 @@ static int isInMaliciousLoadWhitelist(float power) {
 }
 
 int maliciousLoadDetect(float *fft, float pulseI, float deltaActivePower, float deltaReactivePower,
-        float effU, float activePower, float reactivePower, DateStruct *date, char *errMsg) {
+        float effU, float activePower, float reactivePower, WaveFeature *deltaWf, DateStruct *date,
+        char *errMsg) {
 
     if (deltaActivePower < 0)
         return 0;
@@ -81,6 +82,14 @@ int maliciousLoadDetect(float *fft, float pulseI, float deltaActivePower, float 
             sprintf(errMsg, "wl:%.2f", stActivePower);
         }
         return 0;
+    }
+
+    //半波设备
+    if (deltaWf->extremeNum == 1 && deltaWf->flatNum >= 10) {
+        if (errMsg != NULL) {
+            sprintf(errMsg, "hfd: %d %d", deltaWf->extremeNum, deltaWf->flatNum);
+        }
+        return 2;
     }
 
     float powerFactor = deltaActivePower
@@ -102,7 +111,7 @@ int maliciousLoadDetect(float *fft, float pulseI, float deltaActivePower, float 
         if (month > 3 && month < 11) { //非寒冷月份不存在热空调，直接报警
             return 1;
         } else {
-            if ((fft[1] + fft[2] + fft[3] + fft[4]) / fft[0] >= 0.1) {
+            if ((fft[1] + fft[2] + fft[3] + fft[4]) / fft[0] >= 0.1f) {
                 if (errMsg != NULL) {
                     sprintf(errMsg, "fc:%.2f %.2f %.2f %.2f %.2f", fft[0], fft[1], fft[2], fft[3], fft[4]);
                 }

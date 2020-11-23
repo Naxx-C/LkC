@@ -60,11 +60,14 @@ static int *gMoreInfoIndex = NULL; // point to next write point
 static float *mLastPeriodPiont = NULL;
 static char *gIsFirst = NULL;
 
+static int gIsInitialized = 0;
 //初始化
 int arcAlgoInit(int channelNum) {
     //已经初始化过
-    if (gTimer != NULL)
-        return 1;
+    if (gIsInitialized)
+        return 0;
+    else
+        gIsInitialized = 1;
     //通道数不可以大于8
     if (channelNum >= 8)
         return -2;
@@ -195,8 +198,7 @@ static int isConsistent(float *current, int length, float direction, float thres
 
 // 极值点在查找范围内，则认为是吸尘器等造成的电弧误报
 static int SEARCH_TOLERANCE = 6;
-static int isExtremeInRange(float *current, int currentLen, int arcFaultIndex, int range,
-        float averageDelta) {
+static int isExtremeInRange(float *current, int currentLen, int arcFaultIndex, int range, float averageDelta) {
     if (arcFaultIndex < 1)
         return 1;
     float faultDelta = (float) (current[arcFaultIndex] - current[arcFaultIndex - 1]);
@@ -293,7 +295,6 @@ static int getBigNum(float *in, int len, float thresh, float ratio) {
     return counter;
 }
 
-
 /***
  * 为电弧记录量身定制
  *
@@ -343,7 +344,7 @@ static float getLastestFluctuation(float *inputs, int inputLen, int end, int len
  * @return 是否需要故障报警,0不需要,1需要,-1未初始化
  */
 int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, int *outArcNum,
-        int *outThisPeriodNum) {
+        int *outThisPeriodNum, char *msg) {
     if (gTimer == NULL || channel >= gChannelNum) {
         return -1;
     }

@@ -184,12 +184,14 @@ int getChargingAlarmMode(void) {
 
 int similarityTest(void) {
 
+#if LOG_ON == 1
     for (int i = 0; i < sizeof(chargers) / 20; i++)
         for (int j = 0; j < sizeof(chargers) / 20; j++) {
 
             float s = getCosineSimilarity(chargers[i], chargers[j], 0, 5);
             printf("n=%d %dvs%d: theta=%.2f\n", sizeof(chargers) / 20, i, j, s);
         }
+#endif
     return 0;
 }
 

@@ -19,7 +19,7 @@ void setArcFftEnabled(char fftEnabled);
 void setArcOverlayCheckEnabled(char enable);
 int arcAlgoStatus(void);
 int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, int *outArcNum,
-        int *outThisPeriodNum);
+        int *outThisPeriodNum, char *msg);
 #define ARC_CON_PREJ 1
 #define ARC_CON_PN 2
 #define ARC_CON_CONS 3

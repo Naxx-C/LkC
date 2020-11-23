@@ -16,12 +16,48 @@
 //static char *dirPath = "F:\\Tmp\\tiaoya";
 //static char *dirPath = "F:\\Tmp\\charging_yes";
 //static char *dirPath = "F:\\Tmp\\maliload";
-static char *dirPath = "F:\\Tmp\\dingpinkongtiao";
+static char *dirPath = "F:\\Tmp\\tiaoya_3";
+//static char *dirPath = "F:\\Tmp\\dingpinkongtiao";
 
-static int init(){
+static int init() {
 
+    initTpsonAlgoLib();
+    setModuleEnable(ALGO_CHARGING_DETECT, 1);
+    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
+    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
     return 0;
 }
+
+//static void sampleCall() {
+//    //初始化
+//    initTpsonAlgoLib();
+//
+//    //使能需要的算法模块
+//    setModuleEnable(ALGO_CHARGING_DETECT, 1);
+//    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+//    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
+//    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
+//
+//    float current[128], voltage[128];
+//    //送数据,传入电流电压采样buff的起始指针
+//    feedData(current, voltage, time(NULL), NULL);
+//
+//    //获取算法结果
+//    if(getChargingDetectResult()){
+//        //do something
+//    };
+//    if(getDormConverterDetectResult()){
+//        //do something
+//    };
+//    if(getMaliLoadDetectResult()){
+//        //do something
+//    };
+//    int arcNum=0,onePeriodNum=0;
+//    if(getArcfaultDetectResult(&arcNum,&onePeriodNum)){
+//        //do something
+//    };
+//}
 
 int algo_set_test() {
 
@@ -41,7 +77,7 @@ int algo_set_test() {
             initTpsonAlgoLib();
             int convertHardcode = 1;
             if (startWith(entry->d_name, "elec_"))
-                convertHardcode = 1;//TODO:11月之前的，单相电抓的数据是反的,需要-1
+                convertHardcode = 1; //TODO:11月之前的，单相电抓的数据是反的,需要-1
 
             fileIndex = 0;
             memset(csv, 0, sizeof(csv));
@@ -61,7 +97,7 @@ int algo_set_test() {
                 fileIndex++;
                 i++;
                 if (i >= 128) {
-                    feedData(current, 0, voltage, 0, time(NULL), NULL);
+                    feedData(current, voltage, time(NULL), NULL);
                     i = 0;
                 }
                 pointNum++;

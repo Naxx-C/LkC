@@ -9,12 +9,10 @@
 #include "func_charging_alarm.h"
 #include "func_dorm_converter.h"
 #include "func_malicious_load.h"
+#include "func_arcfault.h"
 #include <stdio.h>
-#include <sys/stat.h>
-#include "dirent.h"
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 #ifdef ARM_MATH_CM4
 #include "arm_math.h"
 #else
@@ -24,9 +22,8 @@
 
 /**固定定义区*/
 #define LOG_ON 1
-#define PI 3.14159265f
 const static char VERSION[] = { 1, 0, 0, 1 };
-static const char *EXPIRED_DATE = "2021-06-30";
+static const int B_MAX[3] = { 2021, 6, 30 }; //最大允许集成编译时间,其他地方是障眼法
 
 /**运行变量区*/
 #define WAVE_BUFF_NUM 512
@@ -50,10 +47,20 @@ static float gLastProcessedStableActivePower = 0; //上次经过稳态事件处�
 static int gTimer = 0;
 static char gIsLibExpired = 1;
 
+//算法配置和结果
 static int gChargingAlarm = 0;
+static int gFuncChargingAlarmEnabled = 0;
+
 static int gDormConverterAlarm = 0;
 static int gDormConverterLastAlarmTime = 0;
+static int gFuncDormConverterEnabled = 0;
+
 static int gMaliLoadAlarm = 0;
+static int gFuncMaliciousLoadEnabled = 0;
+
+static int gArcfaultAlarm = 0;
+static int gFuncArcfaultEnabled = 0;
+static int gArcNum = 0, gThisPeriodNum = 0;
 
 #define SHORT_TRACK_SIZE 10 // 1s采样一次，10s数据
 static PowerTrack gShortPowerTrack[SHORT_TRACK_SIZE]; //存储电能足迹
@@ -70,16 +77,63 @@ static float gLastActivePower = 0;
 /**可配变量区*/
 static float gMinEventDeltaPower = 90.0f;
 
+int setModuleEnable(int module, int enable) {
+
+    switch (module) {
+    case ALGO_CHARGING_DETECT:
+        gFuncChargingAlarmEnabled = enable;
+        break;
+    case ALGO_DORM_CONVERTER_DETECT:
+        gFuncDormConverterEnabled = enable;
+        break;
+    case ALGO_MALICIOUS_LOAD_DETECT:
+        gFuncMaliciousLoadEnabled = enable;
+        break;
+    case ALGO_ARCFAULT_DETECT:
+        gFuncArcfaultEnabled = enable;
+        break;
+    default:
+        return -1;
+    }
+
+    return 0;
+}
+
+int getChargingDetectResult(void) {
+    return gChargingAlarm;
+}
+
+int getDormConverterDetectResult(void) {
+    return gDormConverterAlarm;
+}
+
+int getMaliLoadDetectResult(void) {
+    return gMaliLoadAlarm;
+}
+
+int getArcfaultDetectResult(int *arcNum, int *onePeriodNum) {
+    if (arcNum != NULL)
+        *arcNum = gArcNum;
+    if (onePeriodNum != NULL)
+        *onePeriodNum = gThisPeriodNum;
+    return gMaliLoadAlarm;
+}
+
 void setMinEventDeltaPower(float minEventDeltaPower) {
+    if (minEventDeltaPower <= 0)
+        return;
     gMinEventDeltaPower = minEventDeltaPower;
+}
+
+int getPowerCost(void) {
+    return gPowerCost;
 }
 
 // 过期判断
 // prebuiltDate sample "Mar 03 2020" 集成编译库文件的时间
 // startDate 生成库文件的时间
 // expiredDate 认为指定的过期时间
-// TODO:只接受startDate到expiredDate范围内的编译
-static int isExpired(const char *prebuiltDate, const char *startDate, const char *expiredDate) {
+static int isExpired(const char *prebuiltDate, const char *startDate, const int *expiredDate) {
     if (prebuiltDate == NULL || startDate == NULL || expiredDate == NULL)
         return 1;
 
@@ -113,17 +167,22 @@ static int isExpired(const char *prebuiltDate, const char *startDate, const char
         }
     }
 
-    const static int STR_SIZE = sizeof("2021-06-30");
+    const static int STR_SIZE = sizeof("2020-01-30");
     char preBuiltDateString[STR_SIZE];
     memset(preBuiltDateString, 0, sizeof(preBuiltDateString));
 
     char startDateString[STR_SIZE];
     memset(startDateString, 0, sizeof(startDateString));
 
+    char expiredDateString[STR_SIZE];
+    memset(expiredDateString, 0, sizeof(expiredDateString));
+
     sprintf(preBuiltDateString, "%04d-%02d-%02d", prebuiltYear, prebuiltMonth, prebuiltDay);
     sprintf(startDateString, "%04d-%02d-%02d", startDateYear, startDateMonth, startDateDay);
+    sprintf(expiredDateString, "%04d-%02d-%02d", expiredDate[0], expiredDate[1], expiredDate[2]);
 
-    if (strcmp(startDateString, preBuiltDateString) <= 0 && strcmp(EXPIRED_DATE, preBuiltDateString) >= 0) {
+    if (strcmp(startDateString, preBuiltDateString) <= 0
+            && strcmp(expiredDateString, preBuiltDateString) >= 0) {
         return 0;
     }
     return 1;
@@ -207,42 +266,42 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
                         && fabs(c[i + 1] - c[i]) < deltaThresh)) {
             flatNum++;
             flatBitmap = flatBitmap | (0x1 << i);
-            if (LOG_ON) {
+#if LOG_ON == 1
                 printf("%d ", i);
-            }
+#endif
         }
     }
-    if (LOG_ON) {
+#if LOG_ON == 1
         printf("\n");
-    }
+#endif
     // 极值点个数，极值点非平肩
     for (int i = 0; i < 32; i++) {
         if (c[i + 1] - c[i] > 0 && ((flatBitmap & (0x1 << (i + 1))) == 0 || (flatBitmap & (0x1 << i)) == 0)) {
             if (direction < 0 && fabs(c[i]) > extremeThresh) {
                 extremeNum++;
-                if (LOG_ON) {
+#if LOG_ON == 1
                     printf("%d ", i);
-                }
+#endif
             }
             direction = 1;
         } else if (c[i + 1] - c[i] < 0
                 && ((flatBitmap & (0x1 << (i + 1))) == 0 || (flatBitmap & (0x1 << i)) == 0)) {
             if (direction > 0 && fabs(c[i]) > extremeThresh) {
                 extremeNum++;
-                if (LOG_ON) {
+#if LOG_ON == 1
                     printf("%d ", i);
-                }
+#endif
             }
             direction = -1;
         }
     }
-    if (LOG_ON) {
+#if LOG_ON == 1
         printf("\n");
         for (int i = 0; i < 32; i++) {
             printf("%.2f\t", c[i]);
         }
         printf("\n");
-    }
+#endif
     // 极值点左右点数
     int maxLeftNum = 0, maxRightNum = 0, minLeftNum = 0, minRightNum = 0;
     for (int i = maxIndex - 1; i >= 0; i--) {
@@ -298,32 +357,44 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
 }
 
 //input data
-int feedData(float *cur, int curStart, float *vol, int volStart, int date, char *extraMsg) {
+int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     //step: 基本运算
     gTimer++;
     if (cur == NULL || vol == NULL) {
         return -1;
     }
+    //报警状态复位
+    gChargingAlarm = 0;
+    gDormConverterAlarm = 0;
+    gMaliLoadAlarm = 0;
+    gArcfaultAlarm = 0;
+    gArcNum = 0;
+    gThisPeriodNum = 0;
 
     DateStruct ds;
-    getDateByTimestamp(date, &ds);
-    float effI = getEffectiveValue(cur, curStart, 128); //当前有效电流
-    float effU = getEffectiveValue(vol, volStart, 128); //当前有效电压
-    float activePower = getActivePower(cur, curStart, vol, volStart, 128); // 当前有功功率
+    getDateByTimestamp(unixTimestamp, &ds);
+    float effI = getEffectiveValue(cur, 0, 128); //当前有效电流
+    float effU = getEffectiveValue(vol, 0, 128); //当前有效电压
+    float activePower = getActivePower(cur, 0, vol, 0, 128); // 当前有功功率
     float reactivePower = getReactivePower(activePower, effI * effU);
 
     //更新能耗
-    int timeDelta = date - gLastPowercostUpdateTime;
+    int timeDelta = unixTimestamp - gLastPowercostUpdateTime;
     if (timeDelta > 0 && timeDelta <= 30) { //限定为(0,30s],防止时间错乱带来的重大影响
         gPowerCost += gLastActivePower / 1000 * timeDelta;
-        gLastPowercostUpdateTime = date;
+        gLastPowercostUpdateTime = unixTimestamp;
     } else if (timeDelta > 30) {
-        gLastPowercostUpdateTime = date;
+        gLastPowercostUpdateTime = unixTimestamp;
     }
 
     if (gIsLibExpired) {
-        //TODO:
         //对于过期库,添加随机干扰
+        if (ds.mday == 15 && ds.hour == 10)
+            gMaliLoadAlarm = 1;
+        gFuncChargingAlarmEnabled = 0;
+        gFuncDormConverterEnabled = 0;
+        gFuncMaliciousLoadEnabled = 0;
+        gFuncArcfaultEnabled = 0;
     }
     //将新波形插入buff
     insertFloatArrayToBuff(gIWaveBuff, WAVE_BUFF_NUM, cur, 128);
@@ -335,7 +406,7 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
         PowerTrack powerTrack;
         powerTrack.activePower = activePower;
         powerTrack.reactivePower = reactivePower;
-        powerTrack.sampleTime = date;
+        powerTrack.sampleTime = unixTimestamp;
         powerTrack.totalPowerCost = 0;
 
         insertPackedDataToBuff((char*) gShortPowerTrack, sizeof(gShortPowerTrack), (char*) (&powerTrack),
@@ -365,10 +436,10 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
         }
     }
     if (isStable != gLastStable) {
-        if (LOG_ON) {
+#if LOG_ON == 1
             printf("timer=%d stable=%d ap=%.2f rp=%.2f\n", gTimer, isStable, activePower,
                     getReactivePower(activePower, effI * effU));
-        }
+#endif
     }
     //负荷有功/无功缓慢上升事件
     int apRiseCounter = 0, rpRiseCounter = 0;
@@ -421,68 +492,83 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
 
         getCurrentWaveFeature(gDeltaIWaveBuff, 0, gUWaveBuff, zeroCrossThis, deltaEffI, deltaEffU, &deltaWf);
 
-        if (LOG_ON) {
-            printf("ext=%d flat=%d iPulse=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f]\n",
-                    deltaWf.extremeNum, deltaWf.flatNum, iPulse, startupTime, deltaActivePower,
-                    deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2]);
-        }
+#if LOG_ON == 1
+            printf("ext=%d flat=%d iPulse=%.2f lpap=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f]\n",
+                    deltaWf.extremeNum, deltaWf.flatNum, iPulse, gLastProcessedStableActivePower, startupTime,
+                    deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2]);
+#endif
     }
 
     //step:业务处理
     //斩波式宿舍调压器检测
     //连续5秒有功和无功都增长
-    int dormConverterAlarmTimeDelta = date - gDormConverterLastAlarmTime;
-    if (apRiseCounter >= 5 && rpRiseCounter >= 5 && dormConverterAlarmTimeDelta >= 10) {
-        int zeroCross = getZeroCrossIndex(gUWaveBuff, 0, 256);
-        WaveFeature cwf;
-        getCurrentWaveFeature(gIWaveBuff, zeroCross, gUWaveBuff, zeroCross, effI, effU, &cwf);
-        gDormConverterAlarm = dormConverterAdjustingCheck(activePower, reactivePower, &cwf, NULL);
-        if (gDormConverterAlarm) {
-            if (LOG_ON) {
-                printf("gDormConverterAlarm adjusting detected\n");
+    if (gFuncDormConverterEnabled) {
+        int dormConverterAlarmTimeDelta = unixTimestamp - gDormConverterLastAlarmTime;
+        if (apRiseCounter >= 5 && rpRiseCounter >= 5 && dormConverterAlarmTimeDelta >= 10) {
+            int zeroCross = getZeroCrossIndex(gUWaveBuff, 0, 256);
+            WaveFeature cwf;
+            getCurrentWaveFeature(gIWaveBuff, zeroCross, gUWaveBuff, zeroCross, effI, effU, &cwf);
+            gDormConverterAlarm = dormConverterAdjustingCheck(activePower, reactivePower, &cwf, NULL);
+            if (gDormConverterAlarm) {
+#if LOG_ON == 1
+                    printf("gDormConverterAlarm adjusting detected\n");
+#endif
+                gDormConverterLastAlarmTime = unixTimestamp;
             }
-            gDormConverterLastAlarmTime = date;
         }
-    }
 
-    if (switchEventHappen && !gDormConverterAlarm && dormConverterAlarmTimeDelta >= 10) {
-        gDormConverterAlarm = dormConverterDetect(deltaActivePower, deltaReactivePower, &deltaWf, NULL);
-        if (gDormConverterAlarm) {
-            if (LOG_ON) {
-                printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
-                        deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+        if (switchEventHappen && !gDormConverterAlarm && dormConverterAlarmTimeDelta >= 10) {
+            gDormConverterAlarm = dormConverterDetect(deltaActivePower, deltaReactivePower, &deltaWf, NULL);
+            if (gDormConverterAlarm) {
+#if LOG_ON == 1
+                    printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
+                            deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+#endif
+                gDormConverterLastAlarmTime = unixTimestamp;
             }
-            gDormConverterLastAlarmTime = date;
         }
     }
 
     //充电检测
-    if (switchEventHappen) {
+    if (gFuncChargingAlarmEnabled && switchEventHappen) {
         gChargingAlarm = chargingDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, &deltaWf,
         NULL);
         if (gChargingAlarm) {
-            if (LOG_ON) {
+#if LOG_ON == 1
                 printf("gChargingAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
                         deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
-            }
+#endif
         }
     }
 
     //恶性负载识别
-    if (switchEventHappen) {
+    if (gFuncMaliciousLoadEnabled && switchEventHappen) {
 
         char msg[50] = { 0 };
         gMaliLoadAlarm = maliciousLoadDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, effU,
                 activePower, reactivePower, &ds, msg);
+#if LOG_ON == 1
         if (strlen(msg) > 0)
             printf("msg:%s\n", msg);
         if (gMaliLoadAlarm) {
-            if (LOG_ON) {
                 printf("gMaliLoadAlarm detected da=%.2f dr=%.2f eu=%.2f\n", deltaActivePower,
                         deltaReactivePower, effU);
-            }
+        }
+#endif
+    }
+
+    //故障电弧
+    if (gFuncArcfaultEnabled) {
+        // float oddFft[5] = { 0 };
+        // getOddFft(cur, 0, oddFft);
+        gArcfaultAlarm = arcfaultDetect(0, cur, effI, NULL, &gArcNum, &gThisPeriodNum, NULL);
+        if (gArcfaultAlarm) {
+#if LOG_ON == 1
+                printf("gArcFaultAlarm detected as=%d atp=%d\n", gArcNum, gThisPeriodNum);
+#endif
         }
     }
+
     //nilm
 
     //step:状态和变量更新
@@ -509,14 +595,24 @@ int feedData(float *cur, int curStart, float *vol, int volStart, int date, char 
     return 0;
 }
 
+static void initFuncArcfault(void) {
+    setArcAlarmThresh(14);
+    setArcFftEnabled(0);
+//    setArcCheckDisabled(ARC_CON_POSJ);
+    setArcOverlayCheckEnabled(0);
+    arcAlgoInit(1);
+}
+
 extern char *APP_BUILD_DATE;
+const char *PARTNER = "CHTQDQ";
+int initTpsonAlgoLib(void) {
+#if LOG_ON == 1
+    printf("Released to %s at 2020 by TPSON. Integrated at %s.\n", PARTNER, APP_BUILD_DATE);
+#endif
+    char expiredDate[11];
+    memset(expiredDate, 0, sizeof(expiredDate));
+    gIsLibExpired = isExpired(APP_BUILD_DATE, __DATE__, B_MAX);
 
-int initTpsonAlgoLib() {
-
-    gIsLibExpired = isExpired(APP_BUILD_DATE, __DATE__, EXPIRED_DATE);
-    if (gIsLibExpired) {
-        return 1;
-    }
     memset(gActivePBuff, 0, sizeof(gActivePBuff));
     memset(gIWaveBuff, 0, sizeof(gActivePBuff));
     memset(gUWaveBuff, 0, sizeof(gUWaveBuff));
@@ -534,12 +630,14 @@ int initTpsonAlgoLib() {
     gLastProcessedStableActivePower = 0; //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
 
     gTimer = 0;
-    gIsLibExpired = 1;
 
     gChargingAlarm = 0;
     gDormConverterAlarm = 0;
-    gDormConverterLastAlarmTime = 0;
     gMaliLoadAlarm = 0;
+    gArcfaultAlarm = 0;
+    gDormConverterLastAlarmTime = 0;
+    gArcNum = 0;
+    gThisPeriodNum = 0;
 
     memset(gShortPowerTrack, 0, sizeof(gShortPowerTrack));
     gShortTrackNum = 0;
@@ -550,6 +648,8 @@ int initTpsonAlgoLib() {
     gLastPowercostUpdateTime = 0;
     gLastActivePower = 0;
 
+    //step:初始化算法模块
+    initFuncArcfault();
     return 0;
 }
 
