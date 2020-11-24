@@ -546,7 +546,7 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
 
         char msg[50] = { 0 };
         gMaliLoadAlarm = maliciousLoadDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, effU,
-                activePower, reactivePower, &ds, msg);
+                activePower, reactivePower, &deltaWf, &ds, msg);
 #if LOG_ON == 1
         if (strlen(msg) > 0)
             printf("msg:%s\n", msg);

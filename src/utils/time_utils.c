@@ -1,18 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <unistd.h>
 #include <errno.h>
 #include "time_utils.h"
 /**
  * return returns the time as the number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC)
  */
 int getCurTime(void) {
+#ifndef ARM_MATH_CM4
     time_t timep;
     int t = time(&timep);
 //    p = gmtime(&timep);
 //    printf("%d-%d-%d %d:%d:%d\n",1900 + p->tm_year, 1 + p->tm_mon, p->tm_mday, 8 + p->tm_hour, p->tm_min, p->tm_sec); /*获取当前秒*/
     return t;
+#else
+    return 0;
+#endif
 //    printf("%d\n", p->tm_sec); /*获取当前秒*/
 //    printf("%d\n", p->tm_min); /*获取当前分*/
 //    printf("%d\n", 8 + p->tm_hour);/*获取当前时,这里获取西方的时间,刚好相差八个小时*/
@@ -24,6 +27,7 @@ int getCurTime(void) {
 
 //time函数在stm32平台用不了
 int getDate(int *year, int *month, int *day) {
+#ifndef ARM_MATH_CM4
     time_t timep;
     struct tm *p;
     int t = time(&timep);
@@ -41,6 +45,9 @@ int getDate(int *year, int *month, int *day) {
         *day = p->tm_mday;
 //    printf("%d-%d-%d %d:%d:%d\n",1900 + p->tm_year, 1 + p->tm_mon, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec); /*获取当前秒*/
     return t;
+#else
+    return 0;
+#endif
 }
 
 int getDateByTimestamp(int timestamp, DateStruct *date) {
@@ -62,4 +69,3 @@ int getDateByTimestamp(int timestamp, DateStruct *date) {
     return 0;
 //    printf("%d-%d-%d %d:%d:%d\n",1900 + p->tm_year, 1 + p->tm_mon, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec); /*获取当前秒*/
 }
-

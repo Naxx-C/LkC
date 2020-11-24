@@ -31,7 +31,6 @@ float getAverageValue(float *data, int len) {
     return sum / len;
 }
 
-
 float getThreshAverage(float *data, int len, float thresh) {
 
     float sum = 0;
@@ -45,4 +44,19 @@ float getThreshAverage(float *data, int len, float thresh) {
     if (counter == 0)
         return 0;
     return sum / counter;
+}
+
+/**
+ * 欧式距离相似度
+ */
+float getEuclideanDis(float *a, float *b, int len) {
+    if (a == NULL || b == NULL) {
+        return -1;
+    }
+
+    float ret = 0;
+    for (int i = 0; i < len; i++) {
+        ret += (a[i] - b[i]) * (a[i] - b[i]);
+    }
+    return sqrt(ret);
 }
