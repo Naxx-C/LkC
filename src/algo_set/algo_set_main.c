@@ -116,7 +116,7 @@ int getArcfaultDetectResult(int *arcNum, int *onePeriodNum) {
         *arcNum = gArcNum;
     if (onePeriodNum != NULL)
         *onePeriodNum = gThisPeriodNum;
-    return gMaliLoadAlarm;
+    return gArcfaultAlarm;
 }
 
 void setMinEventDeltaPower(float minEventDeltaPower) {
@@ -130,59 +130,59 @@ int getPowerCost(void) {
 }
 
 // 过期判断
-// prebuiltDate sample "Mar 03 2020" 集成编译库文件的时间
-// startDate 生成库文件的时间
+// appBuildDate sample "Mar 03 2020" 集成编译库文件的时间
+// libBuildDate 生成库文件的时间
 // expiredDate 认为指定的过期时间
-static int isExpired(const char *prebuiltDate, const char *startDate, const int *expiredDate) {
-    if (prebuiltDate == NULL || startDate == NULL || expiredDate == NULL)
+static int isExpired(const char *appBuildDate, const char *libBuildDate, const int *expiredDate) {
+    if (appBuildDate == NULL || libBuildDate == NULL || expiredDate == NULL)
         return 1;
 
     const static char MONTH_NAME[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
             "Oct", "Nov", "Dec" };
     char monthString[4] = { 0 };
-    int prebuiltYear = 2020, prebuiltMonth = 4, prebuiltDay = 2;
-    int startDateYear = 2020, startDateMonth = 4, startDateDay = 1;
+    int appBuildYear = 2020, appBuildMonth = 4, appBuildDay = 2;
+    int libBuildYear = 2020, libBuildMonth = 4, libBuildDay = 1;
     //解析prebuiltDate
-    sscanf(prebuiltDate, "%s %d %d", monthString, &prebuiltDay, &prebuiltYear);
+    sscanf(appBuildDate, "%s %d %d", monthString, &appBuildDay, &appBuildYear);
     //防止时间是中文系统
     if (monthString[0] > 'Z' || monthString[0] < 'A')
         return 1;
 
     for (int i = 0; i < 12; i++) {
         if (strncasecmp(monthString, MONTH_NAME[i], 3) == 0) {
-            prebuiltMonth = i + 1;
+            appBuildMonth = i + 1;
             break;
         }
     }
     //解析startDate
-    sscanf(startDate, "%s %d %d", monthString, &startDateDay, &startDateYear);
+    sscanf(libBuildDate, "%s %d %d", monthString, &libBuildDay, &libBuildYear);
     //防止时间是中文系统
     if (monthString[0] > 'Z' || monthString[0] < 'A')
         return 1;
 
     for (int i = 0; i < 12; i++) {
         if (strncasecmp(monthString, MONTH_NAME[i], 3) == 0) {
-            startDateMonth = i + 1;
+            libBuildMonth = i + 1;
             break;
         }
     }
 
     const static int STR_SIZE = sizeof("2020-01-30");
-    char preBuiltDateString[STR_SIZE];
-    memset(preBuiltDateString, 0, sizeof(preBuiltDateString));
+    char appBuildDateString[STR_SIZE];
+    memset(appBuildDateString, 0, sizeof(appBuildDateString));
 
-    char startDateString[STR_SIZE];
-    memset(startDateString, 0, sizeof(startDateString));
+    char libBuildDateString[STR_SIZE];
+    memset(libBuildDateString, 0, sizeof(libBuildDateString));
 
     char expiredDateString[STR_SIZE];
     memset(expiredDateString, 0, sizeof(expiredDateString));
 
-    sprintf(preBuiltDateString, "%04d-%02d-%02d", prebuiltYear, prebuiltMonth, prebuiltDay);
-    sprintf(startDateString, "%04d-%02d-%02d", startDateYear, startDateMonth, startDateDay);
+    sprintf(appBuildDateString, "%04d-%02d-%02d", appBuildYear, appBuildMonth, appBuildDay);
+    sprintf(libBuildDateString, "%04d-%02d-%02d", libBuildYear, libBuildMonth, libBuildDay);
     sprintf(expiredDateString, "%04d-%02d-%02d", expiredDate[0], expiredDate[1], expiredDate[2]);
 
-    if (strcmp(startDateString, preBuiltDateString) <= 0
-            && strcmp(expiredDateString, preBuiltDateString) >= 0) {
+    if (strcmp(libBuildDateString, appBuildDateString) <= 0
+            && strcmp(expiredDateString, appBuildDateString) >= 0) {
         return 0;
     }
     return 1;
@@ -436,6 +436,11 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
         }
     }
     if (isStable != gLastStable) {
+        char msg[50] = { 0 };
+        sprintf(msg, "t=%d stable=%d ap=%.1f rp=%.1f s=%d", gTimer, isStable, activePower,
+                getReactivePower(activePower, effI * effU), switchEventHappen);
+        if (strlen(msg) > 0 && extraMsg!=NULL)
+            strcpy(extraMsg,msg);
 #if LOG_ON == 1
             printf("timer=%d stable=%d ap=%.2f rp=%.2f\n", gTimer, isStable, activePower,
                     getReactivePower(activePower, effI * effU));
@@ -547,6 +552,8 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
         char msg[50] = { 0 };
         gMaliLoadAlarm = maliciousLoadDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, effU,
                 activePower, reactivePower, &deltaWf, &ds, msg);
+//        if (strlen(msg) > 0)
+//            strcpy(extraMsg,msg);
 #if LOG_ON == 1
         if (strlen(msg) > 0)
             printf("msg:%s\n", msg);
@@ -650,6 +657,7 @@ int initTpsonAlgoLib(void) {
 
     //step:初始化算法模块
     initFuncArcfault();
+    if(gIsLibExpired)return -2;
     return 0;
 }
 

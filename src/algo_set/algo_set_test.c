@@ -16,16 +16,18 @@
 //static char *dirPath = "F:\\Tmp\\tiaoya";
 //static char *dirPath = "F:\\Tmp\\charging_yes";
 //static char *dirPath = "F:\\Tmp\\maliload";
-static char *dirPath = "F:\\Tmp\\tiaoya_3";
+//static char *dirPath = "F:\\Tmp\\tiaoya_3";
 //static char *dirPath = "F:\\Tmp\\dingpinkongtiao";
+//static char *dirPath = "F:\\Tmp\\tiaoyawubao";
+static char *dirPath = "F:\\Tmp\\fail";
 
 static int init() {
 
     initTpsonAlgoLib();
-    setModuleEnable(ALGO_CHARGING_DETECT, 1);
-    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+    setModuleEnable(ALGO_CHARGING_DETECT, 0);
+    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 0);
     setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
-    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
+    setModuleEnable(ALGO_ARCFAULT_DETECT, 0);
     return 0;
 }
 

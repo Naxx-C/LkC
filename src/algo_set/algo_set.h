@@ -48,6 +48,10 @@ void setMinDormConverterPower(float power);//default 150w
 void setMaxDormConverterPower(float power);
 
 /**malicious load detection config api*/
+#define MALI_LOAD_SENSITIVITY_LOW 0
+#define MALI_LOAD_SENSITIVITY_MEDIUM 1
+#define MALI_LOAD_SENSITIVITY_HIGH 2
+void setMaliLoadAlarmMode(int mode);
 void addMaliciousLoadWhitelist(float power);
 void setMaliLoadWhitelistMatchRatio(float minRatio, float maxRatio); //default min=0.9,max=1.1
 void setMaliLoadMinPower(float minPower); //default 200w
