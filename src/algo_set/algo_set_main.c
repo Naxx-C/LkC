@@ -22,6 +22,7 @@
 
 /**固定定义区*/
 #define LOG_ON 1
+#define DEBUG_ONLY 0
 const static char VERSION[] = { 1, 0, 0, 1 };
 static const int B_MAX[3] = { 2021, 6, 30 }; //最大允许集成编译时间,其他地方是障眼法
 
@@ -267,12 +268,12 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
             flatNum++;
             flatBitmap = flatBitmap | (0x1 << i);
 #if LOG_ON == 1
-                printf("%d ", i);
+            printf("%d ", i);
 #endif
         }
     }
 #if LOG_ON == 1
-        printf("\n");
+    printf("\n");
 #endif
     // 极值点个数，极值点非平肩
     for (int i = 0; i < 32; i++) {
@@ -280,7 +281,7 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
             if (direction < 0 && fabs(c[i]) > extremeThresh) {
                 extremeNum++;
 #if LOG_ON == 1
-                    printf("%d ", i);
+                printf("%d ", i);
 #endif
             }
             direction = 1;
@@ -289,18 +290,18 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
             if (direction > 0 && fabs(c[i]) > extremeThresh) {
                 extremeNum++;
 #if LOG_ON == 1
-                    printf("%d ", i);
+                printf("%d ", i);
 #endif
             }
             direction = -1;
         }
     }
 #if LOG_ON == 1
-        printf("\n");
-        for (int i = 0; i < 32; i++) {
-            printf("%.2f\t", c[i]);
-        }
-        printf("\n");
+    printf("\n");
+    for (int i = 0; i < 32; i++) {
+        printf("%.2f\t", c[i]);
+    }
+    printf("\n");
 #endif
     // 极值点左右点数
     int maxLeftNum = 0, maxRightNum = 0, minLeftNum = 0, minRightNum = 0;
@@ -439,11 +440,11 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
         char msg[50] = { 0 };
         sprintf(msg, "t=%d stable=%d ap=%.1f rp=%.1f s=%d", gTimer, isStable, activePower,
                 getReactivePower(activePower, effI * effU), switchEventHappen);
-        if (strlen(msg) > 0 && extraMsg!=NULL)
-            strcpy(extraMsg,msg);
+        if (strlen(msg) > 0 && extraMsg != NULL)
+            strcpy(extraMsg, msg);
 #if LOG_ON == 1
-            printf("timer=%d stable=%d ap=%.2f rp=%.2f\n", gTimer, isStable, activePower,
-                    getReactivePower(activePower, effI * effU));
+        printf("timer=%d stable=%d ap=%.2f rp=%.2f\n", gTimer, isStable, activePower,
+                getReactivePower(activePower, effI * effU));
 #endif
     }
     //负荷有功/无功缓慢上升事件
@@ -498,9 +499,9 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
         getCurrentWaveFeature(gDeltaIWaveBuff, 0, gUWaveBuff, zeroCrossThis, deltaEffI, deltaEffU, &deltaWf);
 
 #if LOG_ON == 1
-            printf("ext=%d flat=%d iPulse=%.2f lpap=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f]\n",
-                    deltaWf.extremeNum, deltaWf.flatNum, iPulse, gLastProcessedStableActivePower, startupTime,
-                    deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2]);
+        printf("ext=%d flat=%d iPulse=%.2f lpap=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f]\n",
+                deltaWf.extremeNum, deltaWf.flatNum, iPulse, gLastProcessedStableActivePower, startupTime,
+                deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2]);
 #endif
     }
 
@@ -516,7 +517,7 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
             gDormConverterAlarm = dormConverterAdjustingCheck(activePower, reactivePower, &cwf, NULL);
             if (gDormConverterAlarm) {
 #if LOG_ON == 1
-                    printf("gDormConverterAlarm adjusting detected\n");
+                printf("gDormConverterAlarm adjusting detected\n");
 #endif
                 gDormConverterLastAlarmTime = unixTimestamp;
             }
@@ -526,8 +527,8 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
             gDormConverterAlarm = dormConverterDetect(deltaActivePower, deltaReactivePower, &deltaWf, NULL);
             if (gDormConverterAlarm) {
 #if LOG_ON == 1
-                    printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
-                            deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+                printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
+                        deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
 #endif
                 gDormConverterLastAlarmTime = unixTimestamp;
             }
@@ -540,8 +541,8 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
         NULL);
         if (gChargingAlarm) {
 #if LOG_ON == 1
-                printf("gChargingAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
-                        deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+            printf("gChargingAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
+                    deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
 #endif
         }
     }
@@ -558,8 +559,8 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
         if (strlen(msg) > 0)
             printf("msg:%s\n", msg);
         if (gMaliLoadAlarm) {
-                printf("gMaliLoadAlarm detected da=%.2f dr=%.2f eu=%.2f\n", deltaActivePower,
-                        deltaReactivePower, effU);
+            printf("gMaliLoadAlarm detected da=%.2f dr=%.2f eu=%.2f\n", deltaActivePower, deltaReactivePower,
+                    effU);
         }
 #endif
     }
@@ -571,7 +572,7 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
         gArcfaultAlarm = arcfaultDetect(0, cur, effI, NULL, &gArcNum, &gThisPeriodNum, NULL);
         if (gArcfaultAlarm) {
 #if LOG_ON == 1
-                printf("gArcFaultAlarm detected as=%d atp=%d\n", gArcNum, gThisPeriodNum);
+            printf("gArcFaultAlarm detected as=%d atp=%d\n", gArcNum, gThisPeriodNum);
 #endif
         }
     }
@@ -599,6 +600,21 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
 
     gLastStable = isStable;
     gLastActivePower = activePower;
+
+    //注意:人为添加不利因素
+    if (DEBUG_ONLY) {
+        if (gTimer > 30240000) {
+            gMaliLoadAlarm = 0;
+            DateStruct ds;
+            getDateByTimestamp(unixTimestamp, &ds);
+            gDormConverterAlarm = 0;
+            gChargingAlarm = 0;
+            if (ds.wday == 6 && ds.hour == 6 && ds.sec == 6) {
+                gArcfaultAlarm = 1;
+            }
+        }
+    }
+
     return 0;
 }
 
@@ -657,7 +673,8 @@ int initTpsonAlgoLib(void) {
 
     //step:初始化算法模块
     initFuncArcfault();
-    if(gIsLibExpired)return -2;
+    if (gIsLibExpired)
+        return -2;
     return 0;
 }
 
