@@ -30,6 +30,8 @@
 								<option defaultValue="gnu.c.debugging.level.max" id="gnu.c.compiler.mingw.exe.debug.option.debugging.level.1192847683" name="Debug Level" superClass="gnu.c.compiler.mingw.exe.debug.option.debugging.level" useByScannerDiscovery="false" valueType="enumerated"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.c.compiler.option.include.paths.1428131324" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/LkC/src/utils}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/LkC/src/algo_set/nilm}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/LkC/src/algo_set}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/utils/fft}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/LkC/src/arcfault_lib}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/LkC/src/charging_alarm_lib}&quot;"/>
@@ -50,18 +52,8 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug.778891644" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug"/>
 						</toolChain>
 					</folderInfo>
-					<folderInfo id="cdt.managedbuild.config.gnu.mingw.exe.debug.1159717985.768192860" name="/" resourcePath="src/dorm_converter_lib">
-						<toolChain id="cdt.managedbuild.toolchain.gnu.mingw.exe.debug.1521260540" name="MinGW GCC" superClass="cdt.managedbuild.toolchain.gnu.mingw.exe.debug" unusedChildren="">
-							<tool id="cdt.managedbuild.tool.gnu.assembler.mingw.exe.debug.958282429" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.mingw.exe.debug.780222198"/>
-							<tool id="cdt.managedbuild.tool.gnu.archiver.mingw.base.646544833" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.mingw.base.384630193"/>
-							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.mingw.exe.debug.1863008078" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.mingw.exe.debug.879380204"/>
-							<tool id="cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.debug.1218443662" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.debug.1057246758"/>
-							<tool id="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.debug.2065531496" name="MinGW C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.debug.391761958"/>
-							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug.1615472495" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug.778891644"/>
-						</toolChain>
-					</folderInfo>
 					<sourceEntries>
-						<entry excluding="dorm_converter_lib|charging_alarm_lib|shortcircuit_lib|nilm_lib|arcfault_lib|c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+						<entry excluding="nilm_lib|dorm_converter_lib|c|arcfault_lib|charging_alarm_lib|nilm|shortcircuit_lib" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

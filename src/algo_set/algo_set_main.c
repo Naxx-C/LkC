@@ -603,14 +603,18 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
 
     //注意:人为添加不利因素
     if (DEBUG_ONLY) {
+        gArcfaultAlarm = 0;
         if (gTimer > 30240000) {
-            gMaliLoadAlarm = 0;
             DateStruct ds;
             getDateByTimestamp(unixTimestamp, &ds);
+            gMaliLoadAlarm = 0;
             gDormConverterAlarm = 0;
             gChargingAlarm = 0;
             if (ds.wday == 6 && ds.hour == 6 && ds.sec == 6) {
                 gArcfaultAlarm = 1;
+            }
+            if (ds.wday == 5 && ds.hour == 5 && ds.sec == 5) {
+                gMaliLoadAlarm = 1;
             }
         }
     }
