@@ -1,21 +1,32 @@
 #include "func_charging_alarm.h"
 #include "algo_base_struct.h"
 #include "math_utils.h"
+#include "algo_set_build.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 
-static int gMode = CHARGING_ALARM_SENSITIVITY_MEDIUM;
-static float gPresetMinPower = -1; //-1表示未配置
-static float gPresetMaxPower = -1;
+static int gMode[CHANNEL_NUM];
+static float gPresetMinPower[CHANNEL_NUM]; //-1表示未配置
+static float gPresetMaxPower[CHANNEL_NUM];
 
-void setMinChargingDevicePower(float power) {
-    gPresetMinPower = power;
+void setMinChargingDevicePower(int channel, float power) {
+    gPresetMinPower[channel] = power;
 
 }
-void setMaxChargingDevicePower(float power) {
-    gPresetMaxPower = power;
+void setMaxChargingDevicePower(int channel, float power) {
+    gPresetMaxPower[channel] = power;
+}
+
+int initFuncChargingAlarm(void) {
+
+    for (int i = 0; i < CHANNEL_NUM; i++) {
+        gMode[i] = CHARGING_ALARM_SENSITIVITY_MEDIUM;
+        gPresetMinPower[CHANNEL_NUM] = -1;
+        gPresetMaxPower[CHANNEL_NUM] = -1;
+    }
+    return 0;
 }
 
 static float chargers[][5] = { { 1.24, 0.89, 0.413, 0.24, 0.321 }, //wangao
@@ -40,7 +51,7 @@ static float chargers[][5] = { { 1.24, 0.89, 0.413, 0.24, 0.321 }, //wangao
  * deltaActivePower:差分有功功率
  * deltaReactivePower:差分无功功率
  */
-int chargingDetect(float *fft, float pulseI, float deltaActivePower, float deltaReactivePower,
+int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower, float deltaReactivePower,
         WaveFeature *wf, char *errMsg) {
 
     float pulseIThresh = 1.5f;
@@ -50,7 +61,7 @@ int chargingDetect(float *fft, float pulseI, float deltaActivePower, float delta
     float minActivePower = 85, minReactivePower = 100, maxActivePower = 280;
     float maxDeltaRatio = 0.8f;
 
-    switch (gMode) {
+    switch (gMode[channel]) {
     case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
         pulseIThresh = 3.0f; //越大越严
         thetaThresh = 10; //越小越严
@@ -84,11 +95,11 @@ int chargingDetect(float *fft, float pulseI, float deltaActivePower, float delta
     }
 
     //功率阈值,手动配置更新
-    if (gPresetMinPower > 0) {
-        minActivePower = gPresetMinPower;
+    if (gPresetMinPower[channel] > 0) {
+        minActivePower = gPresetMinPower[channel];
     }
-    if (gPresetMaxPower > 0) {
-        maxActivePower = gPresetMaxPower;
+    if (gPresetMaxPower[channel] > 0) {
+        maxActivePower = gPresetMaxPower[channel];
     }
 
     if (deltaActivePower < minActivePower || deltaActivePower > maxActivePower || pulseI < pulseIThresh
@@ -140,7 +151,7 @@ int chargingDetect(float *fft, float pulseI, float deltaActivePower, float delta
 
     //极值点左右点数
     int checkPass = 1;
-    switch (gMode) {
+    switch (gMode[channel]) {
     case CHARGING_ALARM_SENSITIVITY_HIGH:
         checkPass = 1;
         break;
@@ -172,14 +183,14 @@ int chargingDetect(float *fft, float pulseI, float deltaActivePower, float delta
 }
 
 static const int MODE_MAX = 2;
-void setChargingAlarmMode(int mode) {
+void setChargingAlarmMode(int channel, int mode) {
     if (mode >= -1 && mode <= MODE_MAX) {
-        gMode = mode;
+        gMode[channel] = mode;
     }
 }
 
-int getChargingAlarmMode(void) {
-    return gMode;
+int getChargingAlarmMode(int channel) {
+    return gMode[channel];
 }
 
 int similarityTest(void) {

@@ -30,29 +30,30 @@ int getArcfaultDetectResult(int channel, int *arcNum, int *onePeriodNum);
 //power cost since device reboot - kws
 int getPowerCost(int channel);
 
-void setMinEventDeltaPower(float minEventDeltaPower);
+void setMinEventDeltaPower(int channel, float minEventDeltaPower);
 /**charging alarm config api*/
 #define CHARGING_ALARM_SENSITIVITY_LOW 0
 #define CHARGING_ALARM_SENSITIVITY_MEDIUM 1
 #define CHARGING_ALARM_SENSITIVITY_HIGH 2
-void setChargingAlarmMode(int mode); //default MEDIUM
-void setMinChargingDevicePower(float power);
-void setMaxChargingDevicePower(float power);
+void setChargingAlarmMode(int channel, int mode); //default MEDIUM
+void setMinChargingDevicePower(int channel, float power);
+void setMaxChargingDevicePower(int channel, float power);
 
 /**dorm converter detection config api*/
 #define DORM_CONVERTER_SENSITIVITY_LOW 0
 #define DORM_CONVERTER_SENSITIVITY_MEDIUM 1
 #define DORM_CONVERTER_SENSITIVITY_HIGH 2
-void setDormConverterAlarmMode(int mode); //default MEDIUM
-void setMinDormConverterPower(float power); //default 150w
-void setMaxDormConverterPower(float power);
+void setDormConverterAlarmMode(int channel, int mode); //default MEDIUM
+void setMinDormConverterPower(int channel, float power); //default 150w
+void setMaxDormConverterPower(int channel, float power);
 
 /**malicious load detection config api*/
 #define MALI_LOAD_SENSITIVITY_LOW 0
 #define MALI_LOAD_SENSITIVITY_MEDIUM 1
 #define MALI_LOAD_SENSITIVITY_HIGH 2
-void setMaliLoadAlarmMode(int mode);
-void addMaliciousLoadWhitelist(float power);
-void setMaliLoadWhitelistMatchRatio(float minRatio, float maxRatio); //default min=0.9,max=1.1
-void setMaliLoadMinPower(float minPower); //default 200w
+void setMaliLoadAlarmMode(int channel, int mode);
+void addMaliciousLoadWhitelist(int channel, float power);
+void removeFromMaliLoadWhitelist(int channel, float power); //remove the best matched power
+void setMaliLoadWhitelistMatchRatio(int channel, float minRatio, float maxRatio); //default min=0.9,max=1.1
+void setMaliLoadMinPower(int channel, float minPower); //default 200w
 #endif /* ALGO_SET_ALGO_SET_H_ */

@@ -1,29 +1,41 @@
 #include "func_dorm_converter.h"
 #include "algo_base_struct.h"
+#include "algo_set_build.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 
-static int gMode = DORM_CONVERTER_SENSITIVITY_MEDIUM;
-static float gPresetMinPower = -1;
-static float gPresetMaxPower = -1;
+static int gMode[CHANNEL_NUM];
+static float gPresetMinPower[CHANNEL_NUM];
+static float gPresetMaxPower[CHANNEL_NUM];
 
-void setMinDormConverterPower(float power) {
-    gPresetMinPower = power;
+void setMinDormConverterPower(int channel, float power) {
+    gPresetMinPower[channel] = power;
 
 }
-void setMaxDormConverterPower(float power) {
-    gPresetMaxPower = power;
+void setMaxDormConverterPower(int channel, float power) {
+    gPresetMaxPower[channel] = power;
+}
+
+int initFuncDormConverter(void) {
+
+    for (int i = 0; i < CHANNEL_NUM; i++) {
+        gMode[i] = DORM_CONVERTER_SENSITIVITY_MEDIUM;
+        gPresetMinPower[i] = -1;
+        gPresetMaxPower[i] = -1;
+    }
+    return 0;
 }
 
 //调压器调整过程中监测
-int dormConverterAdjustingCheck(float activePower, float reactivePower, WaveFeature *wf, char *errMsg) {
+int dormConverterAdjustingCheck(int channel, float activePower, float reactivePower, WaveFeature *wf,
+        char *errMsg) {
     int minExtreme = 2, maxExtreme = 3;
     int minFlat = 14;
     float minActivePower = 150, minReactivePower = 150, maxActivePower = 3000;
     float minDeltaRatio = 0.8f;
 
-    switch (gMode) {
+    switch (gMode[channel]) {
     case DORM_CONVERTER_SENSITIVITY_LOW: //低灵敏度
         minExtreme = 2; //越大越严
         maxExtreme = 2; //越小越严
@@ -54,11 +66,11 @@ int dormConverterAdjustingCheck(float activePower, float reactivePower, WaveFeat
     }
 
     //功率阈值,手动配置更新
-    if (gPresetMinPower > 0) {
-        minActivePower = gPresetMinPower;
+    if (gPresetMinPower[channel] > 0) {
+        minActivePower = gPresetMinPower[channel];
     }
     if (gPresetMaxPower > 0) {
-        maxActivePower = gPresetMaxPower;
+        maxActivePower = gPresetMaxPower[channel];
     }
 
     if (wf->flatNum >= minFlat && wf->maxDelta >= wf->maxValue * minDeltaRatio
@@ -70,14 +82,15 @@ int dormConverterAdjustingCheck(float activePower, float reactivePower, WaveFeat
     return 0;
 }
 
-int dormConverterDetect(float deltaActivePower, float deltaReactivePower, WaveFeature *wf, char *errMsg) {
+int dormConverterDetect(int channel, float deltaActivePower, float deltaReactivePower, WaveFeature *wf,
+        char *errMsg) {
 
     int minExtreme = 2, maxExtreme = 3;
     int minFlat = 14;
     float minActivePower = 100, minReactivePower = 100;
     float minDeltaRatio = 0.8f;
 
-    switch (gMode) {
+    switch (gMode[channel]) {
     case DORM_CONVERTER_SENSITIVITY_LOW: //低灵敏度
         minExtreme = 2; //越大越严
         maxExtreme = 2; //越小越严
@@ -137,12 +150,12 @@ int dormConverterDetect(float deltaActivePower, float deltaReactivePower, WaveFe
 }
 
 static const int MODE_MAX = 2;
-void setDormConverterAlarmMode(int mode) {
+void setDormConverterAlarmMode(int channel, int mode) {
     if (mode >= -1 && mode <= MODE_MAX) {
-        gMode = mode;
+        gMode[channel] = mode;
     }
 }
 
-int getDormConverterAlarmMode(void) {
-    return gMode;
+int getDormConverterAlarmMode(int channel) {
+    return gMode[channel];
 }

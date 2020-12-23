@@ -76,7 +76,7 @@ static int gLastPowercostUpdateTime[CHANNEL_NUM]; //上一次更新功耗时的�
 static float gLastActivePower[CHANNEL_NUM];
 
 /**可配变量区*/
-static float gMinEventDeltaPower = 90.0f;
+static float gMinEventDeltaPower[CHANNEL_NUM];
 
 int setModuleEnable(int module, int enable) {
 
@@ -120,10 +120,10 @@ int getArcfaultDetectResult(int channel, int *arcNum, int *onePeriodNum) {
     return gArcfaultAlarm[channel];
 }
 
-void setMinEventDeltaPower(float minEventDeltaPower) {
+void setMinEventDeltaPower(int channel, float minEventDeltaPower) {
     if (minEventDeltaPower <= 0)
         return;
-    gMinEventDeltaPower = minEventDeltaPower;
+    gMinEventDeltaPower[channel] = minEventDeltaPower;
 }
 
 int getPowerCost(int channel) {
@@ -424,7 +424,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         if (fabs(
                 getStandardPower(activePower, effU)
                         - getStandardPower(gLastStableActivePower[channel], gLastStableUEff[channel]))
-                > gMinEventDeltaPower) {
+                > gMinEventDeltaPower[channel]) {
             switchEventHappen = 1;
         }
     }
@@ -518,8 +518,9 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
             WaveFeature cwf;
             getCurrentWaveFeature(gIWaveBuff[channel], zeroCross, gUWaveBuff[channel], zeroCross, effI, effU,
                     &cwf);
-            gDormConverterAlarm[channel] = dormConverterAdjustingCheck(activePower, reactivePower, &cwf,
-            NULL);
+            gDormConverterAlarm[channel] = dormConverterAdjustingCheck(channel, activePower, reactivePower,
+                    &cwf,
+                    NULL);
             if (gDormConverterAlarm[channel]) {
 #if LOG_ON == 1
                 printf("gDormConverterAlarm adjusting detected\n");
@@ -529,8 +530,9 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         }
 
         if (switchEventHappen && !gDormConverterAlarm[channel] && dormConverterAlarmTimeDelta >= 10) {
-            gDormConverterAlarm[channel] = dormConverterDetect(deltaActivePower, deltaReactivePower, &deltaWf,
-            NULL);
+            gDormConverterAlarm[channel] = dormConverterDetect(channel, deltaActivePower, deltaReactivePower,
+                    &deltaWf,
+                    NULL);
             if (gDormConverterAlarm[channel]) {
 #if LOG_ON == 1
                 printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
@@ -543,8 +545,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 
     //充电检测
     if (gFuncChargingAlarmEnabled && switchEventHappen) {
-        gChargingAlarm[channel] = chargingDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower,
-                &deltaWf,
+        gChargingAlarm[channel] = chargingDetect(channel, deltaOddFft, iPulse, deltaActivePower,
+                deltaReactivePower, &deltaWf,
                 NULL);
         if (gChargingAlarm[channel]) {
 #if LOG_ON == 1
@@ -558,7 +560,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     if (gFuncMaliciousLoadEnabled && switchEventHappen) {
 
         char msg[50] = { 0 };
-        gMaliLoadAlarm[channel] = maliciousLoadDetect(deltaOddFft, iPulse, deltaActivePower,
+        gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, deltaActivePower,
                 deltaReactivePower, effU, activePower, reactivePower, &deltaWf, &ds, msg);
 //        if (strlen(msg) > 0)
 //            strcpy(extraMsg,msg);
@@ -576,7 +578,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     if (gFuncArcfaultEnabled) {
         // float oddFft[5] = { 0 };
         // getOddFft(cur, 0, oddFft);
-        gArcfaultAlarm[channel] = arcfaultDetect(0, cur, effI, NULL, &gArcNum[channel],
+        gArcfaultAlarm[channel] = arcfaultDetect(channel, cur, effI, NULL, &gArcNum[channel],
                 &gThisPeriodNum[channel], NULL);
         if (gArcfaultAlarm[channel]) {
 #if LOG_ON == 1
@@ -658,7 +660,7 @@ static void initFuncArcfault(void) {
     setArcFftEnabled(0);
 //    setArcCheckDisabled(ARC_CON_POSJ);
     setArcOverlayCheckEnabled(0);
-    arcAlgoInit(1);
+    arcAlgoInit(CHANNEL_NUM);
 }
 
 extern char *APP_BUILD_DATE;
@@ -682,6 +684,7 @@ int initTpsonAlgoLib(void) {
 
     for (int i = 0; i < CHANNEL_NUM; i++) {
         gLastStable[i] = 1; // 上个周期的稳态情况
+        gMinEventDeltaPower[i] = 90.0f;
     }
 
     memset(gTransitTime, 0, sizeof(gTransitTime)); // 负荷变化过渡/非稳态时间
@@ -711,6 +714,9 @@ int initTpsonAlgoLib(void) {
 
     //step:初始化算法模块
     initFuncArcfault(); //TODO:改成固定分配
+    initFuncDormConverter();
+    initFuncMaliLoad();
+    initFuncChargingAlarm();
     if (gIsLibExpired)
         return -2;
     return 0;

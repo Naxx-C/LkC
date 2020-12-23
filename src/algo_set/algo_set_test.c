@@ -21,11 +21,11 @@
 //static char *onePath = "F:\\Tmp\\dingpinkongtiao";
 //static char *onePath = "F:\\Tmp\\tiaoyawubao";
 //static char *onePath = "F:\\Tmp\\fail";
-static char gDirs[][100] = { "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charginglk2",
-        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
+static char gDirs[][100] = { "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charging",
+        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilu", "F:\\Tmp\\maliload_zhudanqilk2",
         "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
         "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
-        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc" };
+        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arclk2" };
 
 static int init() {
 
@@ -34,9 +34,12 @@ static int init() {
     setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
     setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
     setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
-    setChargingAlarmMode(CHARGING_ALARM_SENSITIVITY_HIGH);
-    setMaliLoadAlarmMode(MALI_LOAD_SENSITIVITY_HIGH);
-    setMinEventDeltaPower(70);
+
+    for (int channel = 0; channel < CHANNEL_NUM; channel++) {
+        setChargingAlarmMode(channel, CHARGING_ALARM_SENSITIVITY_HIGH);
+        setMaliLoadAlarmMode(channel, MALI_LOAD_SENSITIVITY_HIGH);
+        setMinEventDeltaPower(channel, 70);
+    }
 //    addMaliciousLoadWhitelist(450);
     return 0;
 }
@@ -97,7 +100,8 @@ int algo_set_test() {
                 if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0
                         || !endWith(entry->d_name, ".csv")) //016152951
                     continue;
-                initTpsonAlgoLib();
+//                initTpsonAlgoLib();
+                init();
                 int convertHardcode = 1;
                 if (startWith(entry->d_name, "elec_"))
                     convertHardcode = 1; //TODO:2020.11月之前的，单相电抓的数据是反的,需要-1

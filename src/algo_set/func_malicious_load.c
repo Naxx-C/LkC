@@ -1,6 +1,7 @@
 #include "algo_base_struct.h"
 #include "data_structure_utils.h"
 #include "func_malicious_load.h"
+#include "algo_set_build.h"
 #include "power_utils.h"
 #include "time_utils.h"
 #include <math.h>
@@ -8,84 +9,130 @@
 #include <stdio.h>
 
 static const int MODE_MAX = 2;
-static int gMode = MALI_LOAD_SENSITIVITY_MEDIUM;
-void setMaliLoadAlarmMode(int mode) {
+static int gMode[CHANNEL_NUM];
+void setMaliLoadAlarmMode(int channel, int mode) {
     if (mode >= -1 && mode <= MODE_MAX) {
-        gMode = mode;
+        gMode[channel] = mode;
     }
 }
 
-int getMaliLoadAlarmMode(void) {
-    return gMode;
+int getMaliLoadAlarmMode(int channel) {
+    return gMode[channel];
 }
 
 #define POWER_WHITELIST_SIZE 10
-static float gPowerWhitelist[POWER_WHITELIST_SIZE] = { 0 };
-static int gPowerWhitelistNum = 0;
+static float gPowerWhitelist[CHANNEL_NUM][POWER_WHITELIST_SIZE] = { 0 };
+static int gPowerWhitelistNum[CHANNEL_NUM];
 
-static float gPowerMinRatio = 0.9f;
-static float gPowerMaxRatio = 1.1f;
+static float gPowerMinRatio[CHANNEL_NUM];
+static float gPowerMaxRatio[CHANNEL_NUM];
 
-void setMaliLoadWhitelistMatchRatio(float minRatio, float maxRatio) {
-    gPowerMinRatio = minRatio;
-    gPowerMaxRatio = maxRatio;
+void setMaliLoadWhitelistMatchRatio(int channel, float minRatio, float maxRatio) {
+    gPowerMinRatio[channel] = minRatio;
+    gPowerMaxRatio[channel] = maxRatio;
 }
 
-static float gMinPower = 200;
-void setMaliLoadMinPower(float minPower) {
-    gMinPower = minPower;
+static float gMinPower[CHANNEL_NUM];
+void setMaliLoadMinPower(int channel, float minPower) {
+    gMinPower[channel] = minPower;
+}
+
+int initFuncMaliLoad(void) {
+
+    for (int i = 0; i < CHANNEL_NUM; i++) {
+        gMode[i] = MALI_LOAD_SENSITIVITY_MEDIUM;
+        gPowerMinRatio[i] = 0.9f;
+        gPowerMaxRatio[i] = 1.1f;
+        gMinPower[i] = 200;
+    }
+    return 0;
 }
 
 //添加白名单功率，最多10个，超过10个自动替换最早的，重复添加的自动过滤
-void addMaliciousLoadWhitelist(float power) {
+void addMaliciousLoadWhitelist(int channel, float power) {
     if (power <= 0)
         return;
 
-    for (int i = 0; i < gPowerWhitelistNum; i++) {
+    for (int i = 0; i < gPowerWhitelistNum[channel]; i++) {
         //已存在,返回
-        if (fabs(power - gPowerWhitelist[i]) < 10) {
+        if (fabs(power - gPowerWhitelist[channel][i]) < 10) {
             return;
         }
     }
 
-    insertFloatToBuff(gPowerWhitelist, POWER_WHITELIST_SIZE, power);
-    if (gPowerWhitelistNum < POWER_WHITELIST_SIZE) {
-        gPowerWhitelistNum++;
+    insertFloatToBuff(gPowerWhitelist[channel], POWER_WHITELIST_SIZE, power);
+    if (gPowerWhitelistNum[channel] < POWER_WHITELIST_SIZE) {
+        gPowerWhitelistNum[channel]++;
     }
 }
 
-int getMaliciousLoadWhitelist(float outWhilelist[10]) {
-    int outIndex = 0;
-    for (int i = 0; i < gPowerWhitelistNum && outIndex < 10; i++) {
-        if (gPowerWhitelist[i] > LF) {
-            outWhilelist[outIndex++] = gPowerWhitelist[i];
+//查询区间内功率最接近的白名单并移除
+void removeFromMaliLoadWhitelist(int channel, float power) {
+    if (power <= 0)
+        return;
+
+    int minDeltaIndex = -1;
+    float minDelta = 10000, tmp, ratio;
+    for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
+
+        tmp = fabs(gPowerWhitelist[channel][i] - power);
+        if (tmp < 10) {
+            minDeltaIndex = i;
+            break;
+        }
+        ratio = gPowerWhitelist[channel][i] / power;
+        if (ratio >= gPowerMinRatio[channel] && ratio <= gPowerMaxRatio[channel]) { //匹配
+            if (tmp < minDelta) {
+                minDelta = tmp;
+                minDeltaIndex = i;
+            }
         }
     }
-    return gPowerWhitelistNum;
+
+    if (minDeltaIndex < 0)
+        return;
+
+    for (int i = minDeltaIndex; i < POWER_WHITELIST_SIZE - 1; i++) {
+        gPowerWhitelist[channel][i] = gPowerWhitelist[channel][i + 1];
+    }
+
+    if (gPowerWhitelistNum[channel] > 0) {
+        gPowerWhitelistNum[channel]--;
+    }
 }
 
-static int isInMaliciousLoadWhitelist(float power) {
+int getMaliciousLoadWhitelist(int channel, float outWhilelist[10]) {
+    int outIndex = 0;
+    for (int i = 0; i < gPowerWhitelistNum[channel] && outIndex < 10; i++) {
+        if (gPowerWhitelist[channel][i] > LF) {
+            outWhilelist[outIndex++] = gPowerWhitelist[channel][i];
+        }
+    }
+    return gPowerWhitelistNum[channel];
+}
+
+static int isInMaliciousLoadWhitelist(int channel, float power) {
     if (power <= 0)
         return 0;
     for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
-        float ratio = gPowerWhitelist[i] / power;
-        if (ratio >= gPowerMinRatio && ratio <= gPowerMaxRatio) {
+        float ratio = gPowerWhitelist[channel][i] / power;
+        if (ratio >= gPowerMinRatio[channel] && ratio <= gPowerMaxRatio[channel]) {
             return 1;
         }
     }
-    return gPowerWhitelistNum;
+    return 0;
 }
 
-int maliciousLoadDetect(float *fft, float pulseI, float deltaActivePower, float deltaReactivePower,
-        float effU, float activePower, float reactivePower, WaveFeature *deltaWf, DateStruct *date,
-        char *errMsg) {
+int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActivePower,
+        float deltaReactivePower, float effU, float activePower, float reactivePower, WaveFeature *deltaWf,
+        DateStruct *date, char *errMsg) {
 
     if (deltaActivePower < 0)
         return 0;
 
     int minFlatNum = 15;
     float minPf = 0.97f, maxPulseI = 1.09f, minFft1d3 = 18, maxHarmRatio = 0.1f, minAcReactivePower = 200;
-    switch (gMode) {
+    switch (gMode[channel]) {
     case MALI_LOAD_SENSITIVITY_LOW: //低灵敏度
         minPf = 0.985f; //越大越严
         minFlatNum = 15; //越大越严
@@ -116,14 +163,14 @@ int maliciousLoadDetect(float *fft, float pulseI, float deltaActivePower, float 
     }
 
     float stActivePower = getStandardPower(deltaActivePower, effU);
-    if (stActivePower < gMinPower) {
+    if (stActivePower < gMinPower[channel]) {
         if (errMsg != NULL) {
             sprintf(errMsg, "pc:%.2f %.2f", deltaActivePower, effU);
         }
         return 0;
     }
 
-    if (isInMaliciousLoadWhitelist(stActivePower)) {
+    if (isInMaliciousLoadWhitelist(channel, stActivePower)) {
         if (errMsg != NULL) {
             sprintf(errMsg, "wl:%.2f", stActivePower);
         }

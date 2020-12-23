@@ -8,14 +8,15 @@
  * deltaActivePower:差分有功功率
  * errMsg:错误信息输出,如不需要可以置NULL
  */
-int chargingDetect(float *fft, float pulseI,float deltaActivePower, float deltaReactivePower, WaveFeature *wf, char *errMsg);
+int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower, float deltaReactivePower,
+        WaveFeature *wf, char *errMsg);
 
 #define CHARGING_ALARM_SENSITIVITY_LOW 0
 #define CHARGING_ALARM_SENSITIVITY_MEDIUM 1
 #define CHARGING_ALARM_SENSITIVITY_HIGH 2
-void setChargingAlarmMode(int mode);
-int getChargingAlarmMode(void);
+void setChargingAlarmMode(int channel, int mode);
+int getChargingAlarmMode(int channel);
 
 //init ok: return 0
-int chargingAlarmAlgoinit(void);
+int initFuncChargingAlarm(void);
 #endif
