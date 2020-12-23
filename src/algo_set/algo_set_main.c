@@ -29,51 +29,51 @@ static const int B_MAX[3] = { 2021, 6, 30 }; //最大允许集成编译时间,�
 /**运行变量区*/
 #define WAVE_BUFF_NUM 512
 #define EFF_BUFF_NUM (50 * 1) // effective current buffer NUM
-static float gActivePBuff[EFF_BUFF_NUM];
-static float gIWaveBuff[WAVE_BUFF_NUM]; // FIFO buff, pos0是最老的数据
-static float gUWaveBuff[WAVE_BUFF_NUM];
-static float gLastStableIWaveBuff[WAVE_BUFF_NUM];
-static float gLastStableUWaveBuff[WAVE_BUFF_NUM];
-static float gLastStableIEff = 0;
-static float gLastStableUEff = 0;
-static float gDeltaIWaveBuff[WAVE_BUFF_NUM];
+static float gActivePBuff[CHANNEL_NUM][EFF_BUFF_NUM];
+static float gIWaveBuff[CHANNEL_NUM][WAVE_BUFF_NUM]; // FIFO buff, pos0是最老的数据
+static float gUWaveBuff[CHANNEL_NUM][WAVE_BUFF_NUM];
+static float gLastStableIWaveBuff[CHANNEL_NUM][WAVE_BUFF_NUM];
+static float gLastStableUWaveBuff[CHANNEL_NUM][WAVE_BUFF_NUM];
+static float gLastStableIEff[CHANNEL_NUM];
+static float gLastStableUEff[CHANNEL_NUM];
+static float gDeltaIWaveBuff[CHANNEL_NUM][WAVE_BUFF_NUM];
 
-static int gLastStable = 1; // 上个周期的稳态情况
-static int gTransitTime = 0; // 负荷变化过渡/非稳态时间
-static float gTransitTmpIMax = 0;
+static int gLastStable[CHANNEL_NUM]; // 上个周期的稳态情况
+static int gTransitTime[CHANNEL_NUM]; // 负荷变化过渡/非稳态时间
+static float gTransitTmpIMax[CHANNEL_NUM];
 
-static float gLastStableActivePower = 0; //稳态窗口下最近的有功功率,对于缓慢变化的场景会跟随变化
-static float gLastProcessedStableActivePower = 0; //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
+static float gLastStableActivePower[CHANNEL_NUM]; //稳态窗口下最近的有功功率,对于缓慢变化的场景会跟随变化
+static float gLastProcessedStableActivePower[CHANNEL_NUM]; //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
 
-static int gTimer = 0;
+static int gTimer[CHANNEL_NUM];
 static char gIsLibExpired = 1;
 
 //算法配置和结果
-static int gChargingAlarm = 0;
+static int gChargingAlarm[CHANNEL_NUM];
 static int gFuncChargingAlarmEnabled = 0;
 
-static int gDormConverterAlarm = 0;
-static int gDormConverterLastAlarmTime = 0;
+static int gDormConverterAlarm[CHANNEL_NUM];
+static int gDormConverterLastAlarmTime[CHANNEL_NUM];
 static int gFuncDormConverterEnabled = 0;
 
-static int gMaliLoadAlarm = 0;
+static int gMaliLoadAlarm[CHANNEL_NUM];
 static int gFuncMaliciousLoadEnabled = 0;
 
-static int gArcfaultAlarm = 0;
+static int gArcfaultAlarm[CHANNEL_NUM];
 static int gFuncArcfaultEnabled = 0;
-static int gArcNum = 0, gThisPeriodNum = 0;
+static int gArcNum[CHANNEL_NUM], gThisPeriodNum[CHANNEL_NUM];
 
 #define SHORT_TRACK_SIZE 10 // 1s采样一次，10s数据
-static PowerTrack gShortPowerTrack[SHORT_TRACK_SIZE]; //存储电能足迹
-static int gShortTrackNum = 0;
+static PowerTrack gShortPowerTrack[CHANNEL_NUM][SHORT_TRACK_SIZE]; //存储电能足迹
+static int gShortTrackNum[CHANNEL_NUM];
 
 #define POWER_TRACK_SIZE (60*6) // 10s采样一次，60min数据
-static PowerTrack gPowerTrack[POWER_TRACK_SIZE]; //存储电能足迹
-static int gPowerTrackNum = 0;
+static PowerTrack gPowerTrack[CHANNEL_NUM][POWER_TRACK_SIZE]; //存储电能足迹
+static int gPowerTrackNum[CHANNEL_NUM];
 
-static float gPowerCost = 0; //时间内线路总功耗kws
-static int gLastPowercostUpdateTime = 0; //上一次更新功耗时的线路总的有功功率
-static float gLastActivePower = 0;
+static float gPowerCost[CHANNEL_NUM]; //时间内线路总功耗kws
+static int gLastPowercostUpdateTime[CHANNEL_NUM]; //上一次更新功耗时的线路总的有功功率
+static float gLastActivePower[CHANNEL_NUM];
 
 /**可配变量区*/
 static float gMinEventDeltaPower = 90.0f;
@@ -100,24 +100,24 @@ int setModuleEnable(int module, int enable) {
     return 0;
 }
 
-int getChargingDetectResult(void) {
-    return gChargingAlarm;
+int getChargingDetectResult(int channel) {
+    return gChargingAlarm[channel];
 }
 
-int getDormConverterDetectResult(void) {
-    return gDormConverterAlarm;
+int getDormConverterDetectResult(int channel) {
+    return gDormConverterAlarm[channel];
 }
 
-int getMaliLoadDetectResult(void) {
-    return gMaliLoadAlarm;
+int getMaliLoadDetectResult(int channel) {
+    return gMaliLoadAlarm[channel];
 }
 
-int getArcfaultDetectResult(int *arcNum, int *onePeriodNum) {
+int getArcfaultDetectResult(int channel, int *arcNum, int *onePeriodNum) {
     if (arcNum != NULL)
-        *arcNum = gArcNum;
+        *arcNum = gArcNum[channel];
     if (onePeriodNum != NULL)
-        *onePeriodNum = gThisPeriodNum;
-    return gArcfaultAlarm;
+        *onePeriodNum = gThisPeriodNum[channel];
+    return gArcfaultAlarm[channel];
 }
 
 void setMinEventDeltaPower(float minEventDeltaPower) {
@@ -126,14 +126,16 @@ void setMinEventDeltaPower(float minEventDeltaPower) {
     gMinEventDeltaPower = minEventDeltaPower;
 }
 
-int getPowerCost(void) {
-    return gPowerCost;
+int getPowerCost(int channel) {
+    return gPowerCost[channel];
 }
 
 // 过期判断
 // appBuildDate sample "Mar 03 2020" 集成编译库文件的时间
 // libBuildDate 生成库文件的时间
 // expiredDate 认为指定的过期时间
+static int gAppBuildYear = 2020, gAppBuildMonth = 4, gAppBuildDay = 2;
+static int gLibBuildYear = 2020, gLibBuildMonth = 4, gLibBuildDay = 1;
 static int isExpired(const char *appBuildDate, const char *libBuildDate, const int *expiredDate) {
     if (appBuildDate == NULL || libBuildDate == NULL || expiredDate == NULL)
         return 1;
@@ -141,29 +143,27 @@ static int isExpired(const char *appBuildDate, const char *libBuildDate, const i
     const static char MONTH_NAME[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
             "Oct", "Nov", "Dec" };
     char monthString[4] = { 0 };
-    int appBuildYear = 2020, appBuildMonth = 4, appBuildDay = 2;
-    int libBuildYear = 2020, libBuildMonth = 4, libBuildDay = 1;
     //解析prebuiltDate
-    sscanf(appBuildDate, "%s %d %d", monthString, &appBuildDay, &appBuildYear);
+    sscanf(appBuildDate, "%s %d %d", monthString, &gAppBuildDay, &gAppBuildYear);
     //防止时间是中文系统
     if (monthString[0] > 'Z' || monthString[0] < 'A')
         return 1;
 
     for (int i = 0; i < 12; i++) {
         if (strncasecmp(monthString, MONTH_NAME[i], 3) == 0) {
-            appBuildMonth = i + 1;
+            gAppBuildMonth = i + 1;
             break;
         }
     }
     //解析startDate
-    sscanf(libBuildDate, "%s %d %d", monthString, &libBuildDay, &libBuildYear);
+    sscanf(libBuildDate, "%s %d %d", monthString, &gLibBuildDay, &gLibBuildYear);
     //防止时间是中文系统
     if (monthString[0] > 'Z' || monthString[0] < 'A')
         return 1;
 
     for (int i = 0; i < 12; i++) {
         if (strncasecmp(monthString, MONTH_NAME[i], 3) == 0) {
-            libBuildMonth = i + 1;
+            gLibBuildMonth = i + 1;
             break;
         }
     }
@@ -178,8 +178,8 @@ static int isExpired(const char *appBuildDate, const char *libBuildDate, const i
     char expiredDateString[STR_SIZE];
     memset(expiredDateString, 0, sizeof(expiredDateString));
 
-    sprintf(appBuildDateString, "%04d-%02d-%02d", appBuildYear, appBuildMonth, appBuildDay);
-    sprintf(libBuildDateString, "%04d-%02d-%02d", libBuildYear, libBuildMonth, libBuildDay);
+    sprintf(appBuildDateString, "%04d-%02d-%02d", gAppBuildYear, gAppBuildMonth, gAppBuildDay);
+    sprintf(libBuildDateString, "%04d-%02d-%02d", gLibBuildYear, gLibBuildMonth, gLibBuildDay);
     sprintf(expiredDateString, "%04d-%02d-%02d", expiredDate[0], expiredDate[1], expiredDate[2]);
 
     if (strcmp(libBuildDateString, appBuildDateString) <= 0
@@ -358,19 +358,19 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
 }
 
 //input data
-int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
+int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     //step: 基本运算
-    gTimer++;
+    gTimer[channel]++;
     if (cur == NULL || vol == NULL) {
         return -1;
     }
     //报警状态复位
-    gChargingAlarm = 0;
-    gDormConverterAlarm = 0;
-    gMaliLoadAlarm = 0;
-    gArcfaultAlarm = 0;
-    gArcNum = 0;
-    gThisPeriodNum = 0;
+    gChargingAlarm[channel] = 0;
+    gDormConverterAlarm[channel] = 0;
+    gMaliLoadAlarm[channel] = 0;
+    gArcfaultAlarm[channel] = 0;
+    gArcNum[channel] = 0;
+    gThisPeriodNum[channel] = 0;
 
     DateStruct ds;
     getDateByTimestamp(unixTimestamp, &ds);
@@ -380,83 +380,75 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     float reactivePower = getReactivePower(activePower, effI * effU);
 
     //更新能耗
-    int timeDelta = unixTimestamp - gLastPowercostUpdateTime;
+    int timeDelta = unixTimestamp - gLastPowercostUpdateTime[channel];
     if (timeDelta > 0 && timeDelta <= 30) { //限定为(0,30s],防止时间错乱带来的重大影响
-        gPowerCost += gLastActivePower / 1000 * timeDelta;
-        gLastPowercostUpdateTime = unixTimestamp;
+        gPowerCost[channel] += gLastActivePower[channel] / 1000 * timeDelta;
+        gLastPowercostUpdateTime[channel] = unixTimestamp;
     } else if (timeDelta > 30) {
-        gLastPowercostUpdateTime = unixTimestamp;
+        gLastPowercostUpdateTime[channel] = unixTimestamp;
     }
 
-    if (gIsLibExpired) {
-        //对于过期库,添加随机干扰
-        if (ds.mday == 15 && ds.hour == 10)
-            gMaliLoadAlarm = 1;
-        gFuncChargingAlarmEnabled = 0;
-        gFuncDormConverterEnabled = 0;
-        gFuncMaliciousLoadEnabled = 0;
-        gFuncArcfaultEnabled = 0;
-    }
     //将新波形插入buff
-    insertFloatArrayToBuff(gIWaveBuff, WAVE_BUFF_NUM, cur, 128);
-    insertFloatArrayToBuff(gUWaveBuff, WAVE_BUFF_NUM, vol, 128);
-    insertFloatToBuff(gActivePBuff, EFF_BUFF_NUM, activePower);
+    insertFloatArrayToBuff(gIWaveBuff[channel], WAVE_BUFF_NUM, cur, 128);
+    insertFloatArrayToBuff(gUWaveBuff[channel], WAVE_BUFF_NUM, vol, 128);
+    insertFloatToBuff(gActivePBuff[channel], EFF_BUFF_NUM, activePower);
 
     //将功率插入10s短buff
-    if (gTimer % 50 == 0) {
+    if (gTimer[channel] % 50 == 0) {
         PowerTrack powerTrack;
         powerTrack.activePower = activePower;
         powerTrack.reactivePower = reactivePower;
         powerTrack.sampleTime = unixTimestamp;
         powerTrack.totalPowerCost = 0;
 
-        insertPackedDataToBuff((char*) gShortPowerTrack, sizeof(gShortPowerTrack), (char*) (&powerTrack),
-                sizeof(powerTrack));
-        if (gShortTrackNum < SHORT_TRACK_SIZE) {
-            gShortTrackNum++;
+        insertPackedDataToBuff((char*) gShortPowerTrack[channel], sizeof(gShortPowerTrack[channel]),
+                (char*) (&powerTrack), sizeof(powerTrack));
+        if (gShortTrackNum[channel] < SHORT_TRACK_SIZE) {
+            gShortTrackNum[channel]++;
         }
-        if (gTimer % 500 == 0) {
-            insertPackedDataToBuff((char*) gPowerTrack, sizeof(gPowerTrack), (char*) (&powerTrack),
-                    sizeof(powerTrack));
-            if (gPowerTrackNum < POWER_TRACK_SIZE) {
-                gPowerTrackNum++;
+        if (gTimer[channel] % 500 == 0) {
+            insertPackedDataToBuff((char*) gPowerTrack[channel], sizeof(gPowerTrack[channel]),
+                    (char*) (&powerTrack), sizeof(powerTrack));
+            if (gPowerTrackNum[channel] < POWER_TRACK_SIZE) {
+                gPowerTrackNum[channel]++;
             }
         }
     }
 
     //step: 事件监测
-    int isStable = isPowerStable(gActivePBuff, EFF_BUFF_NUM, 15, 1); //稳态判断
+    int isStable = isPowerStable(gActivePBuff[channel], EFF_BUFF_NUM, 15, 2); //稳态判断
     //负荷投切事件
     int switchEventHappen = 0;
-    if (isStable > gLastStable) {
+    if (isStable > gLastStable[channel]) {
         //投切事件发生
         if (fabs(
                 getStandardPower(activePower, effU)
-                        - getStandardPower(gLastStableActivePower, gLastStableUEff)) > gMinEventDeltaPower) {
+                        - getStandardPower(gLastStableActivePower[channel], gLastStableUEff[channel]))
+                > gMinEventDeltaPower) {
             switchEventHappen = 1;
         }
     }
-    if (isStable != gLastStable) {
+    if (isStable != gLastStable[channel]) {
         char msg[50] = { 0 };
-        sprintf(msg, "t=%d stable=%d ap=%.1f rp=%.1f s=%d", gTimer, isStable, activePower,
+        sprintf(msg, "t=%d stable=%d ap=%.1f rp=%.1f s=%d", gTimer[channel], isStable, activePower,
                 getReactivePower(activePower, effI * effU), switchEventHappen);
         if (strlen(msg) > 0 && extraMsg != NULL)
             strcpy(extraMsg, msg);
 #if LOG_ON == 1
-        printf("timer=%d stable=%d ap=%.2f rp=%.2f\n", gTimer, isStable, activePower,
-                getReactivePower(activePower, effI * effU));
+        printf("channel=%d timer=%d stable=%d ap=%.2f rp=%.2f\n", channel, gTimer[channel], isStable,
+                activePower, getReactivePower(activePower, effI * effU));
 #endif
     }
     //负荷有功/无功缓慢上升事件
     int apRiseCounter = 0, rpRiseCounter = 0;
-    if (gShortTrackNum >= SHORT_TRACK_SIZE) {
+    if (gShortTrackNum[channel] >= SHORT_TRACK_SIZE) {
         for (int i = 0; i < SHORT_TRACK_SIZE - 1; i++) {
-            if (gShortPowerTrack[i].activePower < gShortPowerTrack[i + 1].activePower) {
+            if (gShortPowerTrack[channel][i].activePower < gShortPowerTrack[channel][i + 1].activePower) {
                 apRiseCounter++;
             } else {
                 apRiseCounter = 0;
             }
-            if (gShortPowerTrack[i].reactivePower < gShortPowerTrack[i + 1].reactivePower) {
+            if (gShortPowerTrack[channel][i].reactivePower < gShortPowerTrack[channel][i + 1].reactivePower) {
                 rpRiseCounter++;
             } else {
                 rpRiseCounter = 0;
@@ -473,35 +465,46 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     memset(&deltaWf, 0, sizeof(deltaWf));
     if (switchEventHappen) {
         // 计算差分电流
-        zeroCrossLast = getZeroCrossIndex(gLastStableUWaveBuff, 0, 128);
-        zeroCrossThis = getZeroCrossIndex(gUWaveBuff, 0, 128);
+        zeroCrossLast = getZeroCrossIndex(gLastStableUWaveBuff[channel], 0, 128);
+        zeroCrossThis = getZeroCrossIndex(gUWaveBuff[channel], 0, 128);
 
         for (int i = 0; i < 128; i++) {
-            gDeltaIWaveBuff[i] = gIWaveBuff[zeroCrossThis + i] - gLastStableIWaveBuff[zeroCrossLast + i];
+            gDeltaIWaveBuff[channel][i] = gIWaveBuff[channel][zeroCrossThis + i]
+                    - gLastStableIWaveBuff[channel][zeroCrossLast + i];
         }
 
         // feature1: fft
-        getOddFft(gDeltaIWaveBuff, 0, deltaOddFft);
+        getOddFft(gDeltaIWaveBuff[channel], 0, deltaOddFft);
         // feature2:
-        deltaEffI = getEffectiveValue(gDeltaIWaveBuff, 0, 128);
-        deltaEffU = getEffectiveValue(gUWaveBuff, zeroCrossThis, 128);
-        deltaActivePower = getActivePower(gDeltaIWaveBuff, 0, gUWaveBuff, zeroCrossThis, 128);
+        deltaEffI = getEffectiveValue(gDeltaIWaveBuff[channel], 0, 128);
+        deltaEffU = getEffectiveValue(gUWaveBuff[channel], zeroCrossThis, 128);
+        deltaActivePower = getActivePower(gDeltaIWaveBuff[channel], 0, gUWaveBuff[channel], zeroCrossThis,
+                128);
         deltaReactivePower = getReactivePower(deltaActivePower, deltaEffI * deltaEffU);
 
         // feature3:
-        startupTime = gTransitTime;
+        startupTime = gTransitTime[channel];
 
         // feature4:
-        iPulse = (gTransitTmpIMax - gLastStableIEff) / (effI - gLastStableIEff);
+        iPulse = (gTransitTmpIMax[channel] - gLastStableIEff[channel]) / (effI - gLastStableIEff[channel]);
 
-        gLastProcessedStableActivePower = activePower; //稳态功率缓慢上升的场景,processed不会变
+        gLastProcessedStableActivePower[channel] = activePower; //稳态功率缓慢上升的场景,processed不会变
 
-        getCurrentWaveFeature(gDeltaIWaveBuff, 0, gUWaveBuff, zeroCrossThis, deltaEffI, deltaEffU, &deltaWf);
+        getCurrentWaveFeature(gDeltaIWaveBuff[channel], 0, gUWaveBuff[channel], zeroCrossThis, deltaEffI,
+                deltaEffU, &deltaWf);
 
+        //TODO: remove
+        if (extraMsg != NULL) {
+            char msg[50] = { 0 };
+            sprintf(msg, "mav=%.2f mad=%.2f", deltaWf.maxValue, deltaWf.maxDelta);
+            strcat(extraMsg, msg);
+        }
 #if LOG_ON == 1
-        printf("ext=%d flat=%d iPulse=%.2f lpap=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f]\n",
-                deltaWf.extremeNum, deltaWf.flatNum, iPulse, gLastProcessedStableActivePower, startupTime,
-                deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2]);
+        printf(
+                "ext=%d flat=%d iPulse=%.2f lpap=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f %.2f %.2f]\n",
+                deltaWf.extremeNum, deltaWf.flatNum, iPulse, gLastProcessedStableActivePower[channel],
+                startupTime, deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1],
+                deltaOddFft[2], deltaOddFft[3], deltaOddFft[4]);
 #endif
     }
 
@@ -509,37 +512,41 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     //斩波式宿舍调压器检测
     //连续5秒有功和无功都增长
     if (gFuncDormConverterEnabled) {
-        int dormConverterAlarmTimeDelta = unixTimestamp - gDormConverterLastAlarmTime;
+        int dormConverterAlarmTimeDelta = unixTimestamp - gDormConverterLastAlarmTime[channel];
         if (apRiseCounter >= 5 && rpRiseCounter >= 5 && dormConverterAlarmTimeDelta >= 10) {
-            int zeroCross = getZeroCrossIndex(gUWaveBuff, 0, 256);
+            int zeroCross = getZeroCrossIndex(gUWaveBuff[channel], 0, 256);
             WaveFeature cwf;
-            getCurrentWaveFeature(gIWaveBuff, zeroCross, gUWaveBuff, zeroCross, effI, effU, &cwf);
-            gDormConverterAlarm = dormConverterAdjustingCheck(activePower, reactivePower, &cwf, NULL);
-            if (gDormConverterAlarm) {
+            getCurrentWaveFeature(gIWaveBuff[channel], zeroCross, gUWaveBuff[channel], zeroCross, effI, effU,
+                    &cwf);
+            gDormConverterAlarm[channel] = dormConverterAdjustingCheck(activePower, reactivePower, &cwf,
+            NULL);
+            if (gDormConverterAlarm[channel]) {
 #if LOG_ON == 1
                 printf("gDormConverterAlarm adjusting detected\n");
 #endif
-                gDormConverterLastAlarmTime = unixTimestamp;
+                gDormConverterLastAlarmTime[channel] = unixTimestamp;
             }
         }
 
-        if (switchEventHappen && !gDormConverterAlarm && dormConverterAlarmTimeDelta >= 10) {
-            gDormConverterAlarm = dormConverterDetect(deltaActivePower, deltaReactivePower, &deltaWf, NULL);
-            if (gDormConverterAlarm) {
+        if (switchEventHappen && !gDormConverterAlarm[channel] && dormConverterAlarmTimeDelta >= 10) {
+            gDormConverterAlarm[channel] = dormConverterDetect(deltaActivePower, deltaReactivePower, &deltaWf,
+            NULL);
+            if (gDormConverterAlarm[channel]) {
 #if LOG_ON == 1
                 printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
                         deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
 #endif
-                gDormConverterLastAlarmTime = unixTimestamp;
+                gDormConverterLastAlarmTime[channel] = unixTimestamp;
             }
         }
     }
 
     //充电检测
     if (gFuncChargingAlarmEnabled && switchEventHappen) {
-        gChargingAlarm = chargingDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, &deltaWf,
-        NULL);
-        if (gChargingAlarm) {
+        gChargingAlarm[channel] = chargingDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower,
+                &deltaWf,
+                NULL);
+        if (gChargingAlarm[channel]) {
 #if LOG_ON == 1
             printf("gChargingAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
                     deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
@@ -551,14 +558,14 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     if (gFuncMaliciousLoadEnabled && switchEventHappen) {
 
         char msg[50] = { 0 };
-        gMaliLoadAlarm = maliciousLoadDetect(deltaOddFft, iPulse, deltaActivePower, deltaReactivePower, effU,
-                activePower, reactivePower, &deltaWf, &ds, msg);
+        gMaliLoadAlarm[channel] = maliciousLoadDetect(deltaOddFft, iPulse, deltaActivePower,
+                deltaReactivePower, effU, activePower, reactivePower, &deltaWf, &ds, msg);
 //        if (strlen(msg) > 0)
 //            strcpy(extraMsg,msg);
 #if LOG_ON == 1
         if (strlen(msg) > 0)
             printf("msg:%s\n", msg);
-        if (gMaliLoadAlarm) {
+        if (gMaliLoadAlarm[channel]) {
             printf("gMaliLoadAlarm detected da=%.2f dr=%.2f eu=%.2f\n", deltaActivePower, deltaReactivePower,
                     effU);
         }
@@ -569,10 +576,11 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     if (gFuncArcfaultEnabled) {
         // float oddFft[5] = { 0 };
         // getOddFft(cur, 0, oddFft);
-        gArcfaultAlarm = arcfaultDetect(0, cur, effI, NULL, &gArcNum, &gThisPeriodNum, NULL);
-        if (gArcfaultAlarm) {
+        gArcfaultAlarm[channel] = arcfaultDetect(0, cur, effI, NULL, &gArcNum[channel],
+                &gThisPeriodNum[channel], NULL);
+        if (gArcfaultAlarm[channel]) {
 #if LOG_ON == 1
-            printf("gArcFaultAlarm detected as=%d atp=%d\n", gArcNum, gThisPeriodNum);
+            printf("gArcFaultAlarm detected as=%d atp=%d\n", gArcNum[channel], gThisPeriodNum[channel]);
 #endif
         }
     }
@@ -583,39 +591,62 @@ int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg) {
     // 稳态窗口的变量赋值和状态刷新
     if (isStable > 0) {
         for (int i = 0; i < WAVE_BUFF_NUM; i++) {
-            gLastStableIWaveBuff[i] = gIWaveBuff[i];
-            gLastStableUWaveBuff[i] = gUWaveBuff[i];
+            gLastStableIWaveBuff[channel][i] = gIWaveBuff[channel][i];
+            gLastStableUWaveBuff[channel][i] = gUWaveBuff[channel][i];
         }
-        gLastStableIEff = effI;
-        gLastStableUEff = effU;
-        gLastStableActivePower = activePower;
-        gTransitTime = 0;
-        gTransitTmpIMax = 0;
+        gLastStableIEff[channel] = effI;
+        gLastStableUEff[channel] = effU;
+        gLastStableActivePower[channel] = activePower;
+        gTransitTime[channel] = 0;
+        gTransitTmpIMax[channel] = 0;
     } else { // 非稳态
-        gTransitTime++;
-        if (effI > gTransitTmpIMax) {
-            gTransitTmpIMax = effI;
+        gTransitTime[channel]++;
+        if (effI > gTransitTmpIMax[channel]) {
+            gTransitTmpIMax[channel] = effI;
         }
     }
 
-    gLastStable = isStable;
-    gLastActivePower = activePower;
+    gLastStable[channel] = isStable;
+    gLastActivePower[channel] = activePower;
 
     //注意:人为添加不利因素
+    if (gIsLibExpired) {
+        //对于过期库,添加随机干扰
+        gChargingAlarm[channel] = 0;
+        gDormConverterAlarm[channel] = 0;
+        gMaliLoadAlarm[channel] = 0;
+        gArcfaultAlarm[channel] = 0;
+        if (ds.mday == 15 && ds.hour == 10)
+            gMaliLoadAlarm[channel] = 1;
+        return 2;
+    }
+
+    //2020.11.30 2021.3.1 ok
+    //2020.11.30 2020.3.1 fail
+    if (gLibBuildYear > ds.year || (gLibBuildYear == ds.year && gLibBuildMonth > ds.mon)
+            || (gLibBuildYear == ds.year && gLibBuildMonth == ds.mon && gLibBuildDay > ds.mday)) {
+        gChargingAlarm[channel] = 0;
+        gDormConverterAlarm[channel] = 0;
+        gMaliLoadAlarm[channel] = 0;
+        gArcfaultAlarm[channel] = 0;
+        return 3;
+    }
+
     if (DEBUG_ONLY) {
-        gArcfaultAlarm = 0;
-        if (gTimer > 30240000) {
+        gArcfaultAlarm[channel] = 0;
+        if (gTimer[channel] > 30240000) {
             DateStruct ds;
             getDateByTimestamp(unixTimestamp, &ds);
-            gMaliLoadAlarm = 0;
-            gDormConverterAlarm = 0;
-            gChargingAlarm = 0;
+            gMaliLoadAlarm[channel] = 0;
+            gDormConverterAlarm[channel] = 0;
+            gChargingAlarm[channel] = 0;
             if (ds.wday == 6 && ds.hour == 6 && ds.sec == 6) {
-                gArcfaultAlarm = 1;
+                gArcfaultAlarm[channel] = 1;
             }
             if (ds.wday == 5 && ds.hour == 5 && ds.sec == 5) {
-                gMaliLoadAlarm = 1;
+                gMaliLoadAlarm[channel] = 1;
             }
+            return 4;
         }
     }
 
@@ -645,38 +676,41 @@ int initTpsonAlgoLib(void) {
     memset(gUWaveBuff, 0, sizeof(gUWaveBuff));
     memset(gLastStableIWaveBuff, 0, sizeof(gLastStableIWaveBuff));
     memset(gLastStableUWaveBuff, 0, sizeof(gLastStableUWaveBuff));
-    gLastStableIEff = 0;
-    gLastStableUEff = 0;
+    memset(gLastStableIEff, 0, sizeof(gLastStableIEff));
+    memset(gLastStableUEff, 0, sizeof(gLastStableUEff));
     memset(gDeltaIWaveBuff, 0, sizeof(gDeltaIWaveBuff));
 
-    gLastStable = 1; // 上个周期的稳态情况
-    gTransitTime = 0; // 负荷变化过渡/非稳态时间
-    gTransitTmpIMax = 0;
+    for (int i = 0; i < CHANNEL_NUM; i++) {
+        gLastStable[i] = 1; // 上个周期的稳态情况
+    }
 
-    gLastStableActivePower = 0; //稳态窗口下最近的有功功率,对于缓慢变化的场景会跟随变化
-    gLastProcessedStableActivePower = 0; //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
+    memset(gTransitTime, 0, sizeof(gTransitTime)); // 负荷变化过渡/非稳态时间
+    memset(gTransitTmpIMax, 0, sizeof(gTransitTmpIMax));
 
-    gTimer = 0;
+    memset(gLastStableActivePower, 0, sizeof(gLastStableActivePower)); //稳态窗口下最近的有功功率,对于缓慢变化的场景会跟随变化
+    memset(gLastProcessedStableActivePower, 0, sizeof(gLastProcessedStableActivePower)); //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
 
-    gChargingAlarm = 0;
-    gDormConverterAlarm = 0;
-    gMaliLoadAlarm = 0;
-    gArcfaultAlarm = 0;
-    gDormConverterLastAlarmTime = 0;
-    gArcNum = 0;
-    gThisPeriodNum = 0;
+    memset(gTimer, 0, sizeof(gTimer));
+
+    memset(gChargingAlarm, 0, sizeof(gChargingAlarm));
+    memset(gDormConverterAlarm, 0, sizeof(gDormConverterAlarm));
+    memset(gMaliLoadAlarm, 0, sizeof(gMaliLoadAlarm));
+    memset(gArcfaultAlarm, 0, sizeof(gArcfaultAlarm));
+    memset(gDormConverterLastAlarmTime, 0, sizeof(gDormConverterLastAlarmTime));
+    memset(gArcNum, 0, sizeof(gArcNum));
+    memset(gThisPeriodNum, 0, sizeof(gThisPeriodNum));
 
     memset(gShortPowerTrack, 0, sizeof(gShortPowerTrack));
-    gShortTrackNum = 0;
+    memset(gShortTrackNum, 0, sizeof(gShortTrackNum));
     memset(gPowerTrack, 0, sizeof(gPowerTrack));
-    gPowerTrackNum = 0;
+    memset(gPowerTrackNum, 0, sizeof(gPowerTrackNum));
 
-    gPowerCost = 0;
-    gLastPowercostUpdateTime = 0;
-    gLastActivePower = 0;
+    memset(gPowerCost, 0, sizeof(gPowerCost));
+    memset(gLastPowercostUpdateTime, 0, sizeof(gLastPowercostUpdateTime));
+    memset(gLastActivePower, 0, sizeof(gLastActivePower));
 
     //step:初始化算法模块
-    initFuncArcfault();
+    initFuncArcfault(); //TODO:改成固定分配
     if (gIsLibExpired)
         return -2;
     return 0;

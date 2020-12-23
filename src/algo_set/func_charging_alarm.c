@@ -7,7 +7,7 @@
 #include <math.h>
 
 static int gMode = CHARGING_ALARM_SENSITIVITY_MEDIUM;
-static float gPresetMinPower = -1;//-1表示未配置
+static float gPresetMinPower = -1; //-1表示未配置
 static float gPresetMaxPower = -1;
 
 void setMinChargingDevicePower(float power) {
@@ -92,10 +92,10 @@ int chargingDetect(float *fft, float pulseI, float deltaActivePower, float delta
     }
 
     if (deltaActivePower < minActivePower || deltaActivePower > maxActivePower || pulseI < pulseIThresh
-            || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1) {
+            || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1 || fft[1] * 1.05f > fft[0]) {
         if (errMsg != NULL) {
-            sprintf(errMsg, "da=%.0f pi=%.1f fr=%.2f", deltaActivePower, pulseI,
-                    (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f));
+            sprintf(errMsg, "da=%.0f pi=%.1f fr=%.2f f1=%.2f f3=%.2f", deltaActivePower, pulseI,
+                    (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f), fft[0], fft[1]);
         }
         return 0;
     }

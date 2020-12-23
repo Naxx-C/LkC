@@ -172,7 +172,7 @@ static int getHealth(float *delta, float *absDelta, int len, float thresh) {
 // float* x = { 0, -11, -11.5, -12, -10.5, -14 };
 // // float* x = { 0, 11, 11.5, 12, 10.5, 14 };
 // log(isConsistent(x, -1, 1.5, 1, 5));
-static int isConsistent(float *current, int length, float direction, float thresh, int startIndex,
+static int isConsistent(const float *const current, int length, float direction, float thresh, int startIndex,
         int checkNum) {
 
     if (startIndex + checkNum > length)
@@ -345,7 +345,7 @@ static float getLastestFluctuation(float *inputs, int inputLen, int end, int len
  */
 int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, int *outArcNum,
         int *outThisPeriodNum, char *msg) {
-    if (gTimer == NULL || channel >= gChannelNum) {
+    if (gTimer == NULL || channel >= gChannelNum || gIsInitialized == 0) {
         return -1;
     }
 

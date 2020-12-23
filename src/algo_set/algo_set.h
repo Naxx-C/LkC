@@ -14,7 +14,7 @@
  * unixTimestamp: unixTimestamp like 1605098030 (2020/11/11 20:33:50)
  * extraMsg: some output info like error msg.Can be NULL
  */
-int feedData(float *cur, float *vol, int unixTimestamp, char *extraMsg);
+int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extraMsg);
 int initTpsonAlgoLib(void);
 
 #define ALGO_CHARGING_DETECT 0
@@ -22,13 +22,13 @@ int initTpsonAlgoLib(void);
 #define ALGO_MALICIOUS_LOAD_DETECT 2
 #define ALGO_ARCFAULT_DETECT       3
 int setModuleEnable(int module, int enable);
-int getChargingDetectResult(void);
-int getDormConverterDetectResult(void);
-int getMaliLoadDetectResult(void);
-int getArcfaultDetectResult(int *arcNum, int *onePeriodNum);
+int getChargingDetectResult(int channel);
+int getDormConverterDetectResult(int channel);
+int getMaliLoadDetectResult(int channel);
+int getArcfaultDetectResult(int channel, int *arcNum, int *onePeriodNum);
 
 //power cost since device reboot - kws
-int getPowerCost(void);
+int getPowerCost(int channel);
 
 void setMinEventDeltaPower(float minEventDeltaPower);
 /**charging alarm config api*/
@@ -44,7 +44,7 @@ void setMaxChargingDevicePower(float power);
 #define DORM_CONVERTER_SENSITIVITY_MEDIUM 1
 #define DORM_CONVERTER_SENSITIVITY_HIGH 2
 void setDormConverterAlarmMode(int mode); //default MEDIUM
-void setMinDormConverterPower(float power);//default 150w
+void setMinDormConverterPower(float power); //default 150w
 void setMaxDormConverterPower(float power);
 
 /**malicious load detection config api*/

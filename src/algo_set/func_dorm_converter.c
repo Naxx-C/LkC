@@ -92,7 +92,7 @@ int dormConverterDetect(float deltaActivePower, float deltaReactivePower, WaveFe
         minFlat = 12;
         minActivePower = 100;
         minReactivePower = 80;
-        minDeltaRatio = 0.8f;
+        minDeltaRatio = 0.85f;
         break;
     case DORM_CONVERTER_SENSITIVITY_HIGH: //高灵敏度
         minExtreme = 2;
@@ -100,7 +100,7 @@ int dormConverterDetect(float deltaActivePower, float deltaReactivePower, WaveFe
         minFlat = 10;
         minActivePower = 100;
         minReactivePower = 50;
-        minDeltaRatio = 0.7f;
+        minDeltaRatio = 0.8f;
         break;
 
     default:

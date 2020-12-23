@@ -103,7 +103,7 @@ int maliciousLoadDetect(float *fft, float pulseI, float deltaActivePower, float 
         minAcReactivePower = 205;
         break;
     case MALI_LOAD_SENSITIVITY_HIGH: //高灵敏度
-        minPf = 0.96f;
+        minPf = 0.95f;
         minFlatNum = 13;
         maxPulseI = 1.12f;
         minFft1d3 = 16;
