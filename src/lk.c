@@ -97,10 +97,8 @@ void getX(int **y) {
 }
 
 const char *APP_BUILD_DATE = __DATE__;
-static int xx[3]={2};
 int main() {
     algo_set_test();
-    printf("%d %d\n",xx[1],xx[0]);
     return 0;
 
 //    charging_alarm_main();

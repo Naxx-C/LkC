@@ -95,6 +95,7 @@ void removeFromMaliLoadWhitelist(int channel, float power) {
     for (int i = minDeltaIndex; i < POWER_WHITELIST_SIZE - 1; i++) {
         gPowerWhitelist[channel][i] = gPowerWhitelist[channel][i + 1];
     }
+    gPowerWhitelist[channel][POWER_WHITELIST_SIZE - 1] = 0;
 
     if (gPowerWhitelistNum[channel] > 0) {
         gPowerWhitelistNum[channel]--;

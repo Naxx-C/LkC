@@ -21,11 +21,11 @@
 //static char *onePath = "F:\\Tmp\\dingpinkongtiao";
 //static char *onePath = "F:\\Tmp\\tiaoyawubao";
 //static char *onePath = "F:\\Tmp\\fail";
-static char gDirs[][100] = { "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charging",
-        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilu", "F:\\Tmp\\maliload_zhudanqilk2",
+static char gDirs[][100] = { "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charginglk2",
+        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
         "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
         "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
-        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arclk2" };
+        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arclk2" , "F:\\Tmp\\dorm_falsealarm_charging"};
 
 static int init() {
 
@@ -40,7 +40,11 @@ static int init() {
         setMaliLoadAlarmMode(channel, MALI_LOAD_SENSITIVITY_HIGH);
         setMinEventDeltaPower(channel, 70);
     }
-//    addMaliciousLoadWhitelist(450);
+    addMaliciousLoadWhitelist(1,450);
+    addMaliciousLoadWhitelist(1,460);
+    addMaliciousLoadWhitelist(1,500);
+    addMaliciousLoadWhitelist(1,520);
+    removeFromMaliLoadWhitelist(1, 490);
     return 0;
 }
 

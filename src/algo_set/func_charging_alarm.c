@@ -23,8 +23,8 @@ int initFuncChargingAlarm(void) {
 
     for (int i = 0; i < CHANNEL_NUM; i++) {
         gMode[i] = CHARGING_ALARM_SENSITIVITY_MEDIUM;
-        gPresetMinPower[CHANNEL_NUM] = -1;
-        gPresetMaxPower[CHANNEL_NUM] = -1;
+        gPresetMinPower[i] = -1;
+        gPresetMaxPower[i] = -1;
     }
     return 0;
 }
