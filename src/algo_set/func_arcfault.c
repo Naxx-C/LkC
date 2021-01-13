@@ -1,6 +1,7 @@
 #include "func_arcfault.h"
 #include "power_utils.h"
 #include "math_utils.h"
+#include "algo_set_build.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,7 +11,6 @@
 /**
  * 可配区
  */
-static const char VERSION[] = { 1, 0, 0, 0 };
 static int gMinExtremeDis = 19; // 阻性电弧发生点到极值的最小距离
 static int gMinWidth = 35; // 阻性电弧发生点最少宽度
 static int gDelayCheckTime = 1000 / 20; // 延迟报警时间
@@ -28,120 +28,45 @@ static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至�
 static char gFftEnabled = 0;
 static char gOverlayCheckEnabled = 0;
 static char gCheckEnabled[CHECK_ITEM_NUM];
+static int gMode[CHANNEL_NUM];
 
 /**
  * 自用区
  */
-int *pBigJumpCounter = NULL; // 大跳跃的计数器
-int *pAlarmCounter = NULL; // 报警计数器
-
-static int gChannelNum = 1; // 通道数
-static int *gWatingTime = NULL;
-static int *gTimer = NULL;
-const int ONE_EIGHT_PERIOD = 16; // 8分之1周期
-const char LOG_ON = 1;
-
 #define STATUS_NORMAL 0
 #define STATUS_WAITING_CHECK 1
 #define STATUS_IMMUNE 2
-static int *gStatus = NULL;
-static int *gArcNumAlarming = NULL; // 报警发生时的电弧数目
-#define CYCLE_NUM_1S 50
-static char **gResArcBuff = NULL;
-static char **gInductArcBuff = NULL;
-static int *gArcBuffIndex = NULL; // point to next write point
-static char **gEasyArcBuff = NULL;
+int pBigJumpCounter[CHANNEL_NUM] = { 0 }; // 大跳跃的计数器
+int pAlarmCounter[CHANNEL_NUM] = { 0 }; // 报警计数器
+
+static int gWatingTime[CHANNEL_NUM] = { 0 };
+static int gTimer[CHANNEL_NUM] = { 0 };
+const int ONE_EIGHT_PERIOD = 16; // 8分之1周期
+const char LOG_ON = 1;
+
+static int gStatus[CHANNEL_NUM] = { 0 };
+static int gArcNumAlarming[CHANNEL_NUM] = { 0 }; // 报警发生时的电弧数目
+static char gResArcBuff[CHANNEL_NUM][50] = { 0 };
+static char gInductArcBuff[CHANNEL_NUM][50] = { 0 };
+static int gArcBuffIndex[CHANNEL_NUM] = { 0 }; // point to next write point
+static char gEasyArcBuff[CHANNEL_NUM][50] = { 0 };
 
 #define MOREINFO_BUFF_NUM 20
-static float **gEffBuff = NULL;
-static float **gHarmonicBuff = NULL;
-static int *gMoreInfoIndex = NULL; // point to next write point
+static float gEffBuff[CHANNEL_NUM][50] = { 0 };
+static float gHarmonicBuff[CHANNEL_NUM][50] = { 0 };
+static int gMoreInfoIndex[CHANNEL_NUM] = { 0 }; // point to next write point
 
-static float *mLastPeriodPiont = NULL;
-static char *gIsFirst = NULL;
+static float mLastPeriodPiont[CHANNEL_NUM] = { 0 };
+static char gIsFirst[CHANNEL_NUM] = { 0 };
 
 static int gIsInitialized = 0;
-//初始化
-int arcAlgoInit(int channelNum) {
-    //已经初始化过
-    if (gIsInitialized)
-        return 0;
-    else
-        gIsInitialized = 1;
-    //通道数不可以大于8
-    if (channelNum >= 8)
-        return -2;
 
-    gChannelNum = channelNum;
-    pBigJumpCounter = (int*) malloc(sizeof(int) * gChannelNum); // 大跳跃的计数器
-    memset(pBigJumpCounter, 0, sizeof(int) * gChannelNum);
 
-    pAlarmCounter = (int*) malloc(sizeof(int) * gChannelNum); // 报警计数器
-    memset(pAlarmCounter, 0, sizeof(int) * gChannelNum);
-
-    gWatingTime = (int*) malloc(sizeof(int) * gChannelNum);
-    memset(gWatingTime, 0, sizeof(int) * gChannelNum);
-
-    gTimer = (int*) malloc(sizeof(int) * gChannelNum);
-    memset(gTimer, 0, sizeof(int) * gChannelNum);
-
-    gStatus = (int*) malloc(sizeof(int) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++) {
-        gStatus[i] = STATUS_NORMAL;
+static const int MODE_MAX = 2;
+void setArcfaultAlarmMode(int channel, int mode) {
+    if (mode >= 0 && mode <= MODE_MAX) {
+        gMode[channel] = mode;
     }
-
-    gArcNumAlarming = (int*) malloc(sizeof(int) * gChannelNum);
-    memset(gArcNumAlarming, 0, sizeof(int) * gChannelNum);
-
-    gResArcBuff = (char**) malloc(sizeof(char*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++) {
-        gResArcBuff[i] = (char*) malloc(sizeof(char) * CYCLE_NUM_1S);
-        memset(gResArcBuff[i], 0, sizeof(char) * CYCLE_NUM_1S);
-    }
-
-    gInductArcBuff = (char**) malloc(sizeof(char*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++) {
-        gInductArcBuff[i] = (char*) malloc(sizeof(char) * CYCLE_NUM_1S);
-        memset(gInductArcBuff[i], 0, sizeof(char) * CYCLE_NUM_1S);
-    }
-
-    gArcBuffIndex = (int*) malloc(sizeof(int) * gChannelNum);
-    memset(gArcBuffIndex, 0, sizeof(int) * gChannelNum);
-
-    gEasyArcBuff = (char**) malloc(sizeof(char*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++) {
-        gEasyArcBuff[i] = (char*) malloc(sizeof(char) * CYCLE_NUM_1S);
-        memset(gEasyArcBuff[i], 0, sizeof(char) * CYCLE_NUM_1S);
-    }
-
-    gEffBuff = (float**) malloc(sizeof(float*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++) {
-        gEffBuff[i] = (float*) malloc(sizeof(float) * MOREINFO_BUFF_NUM);
-        memset(gEffBuff[i], 0, sizeof(float) * MOREINFO_BUFF_NUM);
-    }
-
-    gHarmonicBuff = (float**) malloc(sizeof(float*) * gChannelNum);
-    for (int i = 0; i < gChannelNum; i++) {
-        gHarmonicBuff[i] = (float*) malloc(sizeof(float) * MOREINFO_BUFF_NUM);
-        memset(gHarmonicBuff[i], 0, sizeof(float) * MOREINFO_BUFF_NUM);
-    }
-
-    gMoreInfoIndex = (int*) malloc(sizeof(int) * gChannelNum);
-    memset(gMoreInfoIndex, 0, sizeof(int) * gChannelNum);
-
-    mLastPeriodPiont = (float*) malloc(sizeof(float) * gChannelNum);
-    memset(mLastPeriodPiont, 0, sizeof(float) * gChannelNum);
-
-    gIsFirst = (char*) malloc(sizeof(char) * gChannelNum);
-    memset(gIsFirst, 1, sizeof(char) * gChannelNum);
-
-    memset(gCheckEnabled, 1, sizeof(char) * CHECK_ITEM_NUM);
-
-    //内存分配失败
-    if (gIsFirst == NULL)
-        return -1;
-
-    return 0;
 }
 
 static int getHealth(float *delta, float *absDelta, int len, float thresh) {
@@ -330,6 +255,28 @@ static float getLastestFluctuation(float *inputs, int inputLen, int end, int len
     return maxFluctuation * 100;
 }
 
+int initFuncArcfault(void) {
+
+    //已经初始化过
+    if (gIsInitialized)
+        return 0;
+    else
+        gIsInitialized = 1;
+
+    for (int i = 0; i < CHANNEL_NUM; i++) {
+        gStatus[i] = STATUS_NORMAL;
+        gIsFirst[i] = 1;
+        gCheckEnabled[i]=1;
+        gMode[i] = ARCFAULT_SENSITIVITY_MEDIUM;
+    }
+
+    //内存分配失败
+    if (gIsFirst == NULL)
+        return -1;
+
+    return 0;
+}
+
 /**
  * @param current
  *            一个采样周期的电流数据。
@@ -345,7 +292,7 @@ static float getLastestFluctuation(float *inputs, int inputLen, int end, int len
  */
 int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, int *outArcNum,
         int *outThisPeriodNum, char *msg) {
-    if (gTimer == NULL || channel >= gChannelNum || gIsInitialized == 0) {
+    if (gTimer == NULL || channel >= CHANNEL_NUM || gIsInitialized == 0) {
         return -1;
     }
 
@@ -563,7 +510,7 @@ int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, i
     gInductArcBuff[channel][gArcBuffIndex[channel]] = (char) (inductArcNum);
     gEasyArcBuff[channel][gArcBuffIndex[channel]] = (char) easyArcNum;
     gArcBuffIndex[channel]++;
-    if (gArcBuffIndex[channel] >= CYCLE_NUM_1S) {
+    if (gArcBuffIndex[channel] >= 50) {
         gArcBuffIndex[channel] = 0;
     }
 
@@ -572,8 +519,8 @@ int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, i
     int resArcNum1S = 0, inductArcNum1S = 0;
     int dutyCounter = 0, dutyRatio = 0, have2Number = 0, tmpSeries = 0, maxSeries = 0;
     int start = -1, end = -1, totalLen = 0;
-    for (int i = gArcBuffIndex[channel]; i < gArcBuffIndex[channel] + CYCLE_NUM_1S; i++) {
-        int index = i % CYCLE_NUM_1S;
+    for (int i = gArcBuffIndex[channel]; i < gArcBuffIndex[channel] + 50; i++) {
+        int index = i % 50;
         resArcNum1S += gResArcBuff[channel][index];
         inductArcNum1S += gInductArcBuff[channel][index];
         if (gEasyArcBuff[channel][index] > 0) {
@@ -725,8 +672,4 @@ void setArcCheckDisabled(int item) {
 
 void setArcOverlayCheckEnabled(char enable) {
     gOverlayCheckEnabled = enable;
-}
-
-int getArcAlgoVersion() {
-    return VERSION[0] << 24 | VERSION[1] << 16 | VERSION[2] << 8 | VERSION[3];
 }

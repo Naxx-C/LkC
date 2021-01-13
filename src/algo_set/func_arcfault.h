@@ -30,10 +30,13 @@ int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, i
 #define ARC_CON_POSJ 8
 void setArcCheckDisabled(int item);
 /**
- * @param channelNum
- *            channel num, must be <= 8
  * @return 0=normal <0=fatal error >0=something to be checked
  */
-int arcAlgoInit(int channelNum);
+#define ARCFAULT_SENSITIVITY_LOW 0
+#define ARCFAULT_SENSITIVITY_MEDIUM 1
+#define ARCFAULT_SENSITIVITY_HIGH 2
+void setArcfaultAlarmMode(int channel, int mode);
+
+int initFuncArcfault(void);
 
 #endif

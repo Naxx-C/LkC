@@ -25,7 +25,8 @@ static char gDirs[][100] = { "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\
         "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
         "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
         "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
-        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arclk2" , "F:\\Tmp\\dorm_falsealarm_charging"};
+        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
+        "F:\\Tmp\\charging_medium_lowratelk2","F:\\Tmp\\labtoplk2" };
 
 static int init() {
 
@@ -36,14 +37,15 @@ static int init() {
     setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {
-        setChargingAlarmMode(channel, CHARGING_ALARM_SENSITIVITY_HIGH);
+        setChargingAlarmMode(channel, CHARGING_ALARM_SENSITIVITY_MEDIUM);
         setMaliLoadAlarmMode(channel, MALI_LOAD_SENSITIVITY_HIGH);
-        setMinEventDeltaPower(channel, 70);
+        setMinEventDeltaPower(channel, 55);
+        setMinChargingDevicePower(channel, 55);
     }
-    addMaliciousLoadWhitelist(1,450);
-    addMaliciousLoadWhitelist(1,460);
-    addMaliciousLoadWhitelist(1,500);
-    addMaliciousLoadWhitelist(1,520);
+    addMaliciousLoadWhitelist(1, 450);
+    addMaliciousLoadWhitelist(1, 460);
+    addMaliciousLoadWhitelist(1, 500);
+    addMaliciousLoadWhitelist(1, 520);
     removeFromMaliLoadWhitelist(1, 490);
     return 0;
 }

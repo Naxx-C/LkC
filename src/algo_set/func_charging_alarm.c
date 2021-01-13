@@ -63,7 +63,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
 
     switch (gMode[channel]) {
     case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
-        pulseIThresh = 3.0f; //越大越严
+        pulseIThresh = 2.0f; //越大越严
         thetaThresh = 10; //越小越严
         maxExtreme = 2; //越小越严
         minFlat = 18; //越大越严
@@ -72,7 +72,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         maxDeltaRatio = 0.75f; //越小越严
         break;
     case CHARGING_ALARM_SENSITIVITY_MEDIUM:
-        pulseIThresh = 1.5f;
+        pulseIThresh = 1.0f;
         thetaThresh = 13;
         maxExtreme = 4;
         minFlat = 16;
@@ -97,6 +97,10 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
     //功率阈值,手动配置更新
     if (gPresetMinPower[channel] > 0) {
         minActivePower = gPresetMinPower[channel];
+        minReactivePower = minActivePower * 1.2f;
+        if (minReactivePower > 130) {
+            minReactivePower = 130;
+        }
     }
     if (gPresetMaxPower[channel] > 0) {
         maxActivePower = gPresetMaxPower[channel];

@@ -47,6 +47,7 @@ static float gLastProcessedStableActivePower[CHANNEL_NUM]; //上次经过稳态�
 
 static int gTimer[CHANNEL_NUM];
 static char gIsLibExpired = 1;
+//static int gDeltaFftCalVoter = 0; //投票决定是否要对差分波形进行fft运算
 
 //算法配置和结果
 static int gChargingAlarm[CHANNEL_NUM];
@@ -458,7 +459,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 
     //step:特征提取
     float deltaEffI = LF, deltaEffU = LF, iPulse = LF, deltaActivePower = LF, deltaReactivePower = LF;
-    float deltaOddFft[5] = { 0 }; //奇次谐波
+    float deltaOddFft[5] = { LF, LF, LF, LF, LF }; //奇次谐波
     int startupTime = 0; // 启动时间
     int zeroCrossLast = -1, zeroCrossThis = -1; //上个周期及本个周期稳态电压穿越
     WaveFeature deltaWf;
@@ -655,14 +656,6 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     return 0;
 }
 
-static void initFuncArcfault(void) {
-    setArcAlarmThresh(14);
-    setArcFftEnabled(0);
-//    setArcCheckDisabled(ARC_CON_POSJ);
-    setArcOverlayCheckEnabled(0);
-    arcAlgoInit(CHANNEL_NUM);
-}
-
 extern char *APP_BUILD_DATE;
 const char *PARTNER = "CHTQDQ";
 int initTpsonAlgoLib(void) {
@@ -713,7 +706,7 @@ int initTpsonAlgoLib(void) {
     memset(gLastActivePower, 0, sizeof(gLastActivePower));
 
     //step:初始化算法模块
-    initFuncArcfault(); //TODO:改成固定分配
+    initFuncArcfault();
     initFuncDormConverter();
     initFuncMaliLoad();
     initFuncChargingAlarm();
