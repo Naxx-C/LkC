@@ -17,6 +17,7 @@ void setArcInductMaxJumpRatio(float inductMaxJumpRatio);
 void setArcInductJumpMinThresh(float inductJumpMinThresh);
 void setArcFftEnabled(char fftEnabled);
 void setArcOverlayCheckEnabled(char enable);
+void setArcCurrentRange(float minCurrent, float maxCurrent);
 int arcAlgoStatus(void);
 int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, int *outArcNum,
         int *outThisPeriodNum, char *msg);

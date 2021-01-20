@@ -27,6 +27,9 @@ static float gInductMaxJumpRatio = 0.462; // 感性负载跳变值至少满足�
 static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至少满足最大跳变值得百分比
 static char gFftEnabled = 0;
 static char gOverlayCheckEnabled = 0;
+static float gMaxCurrent = 100.0f;
+static float gMinCurrent = 1.5f;
+
 static char gCheckEnabled[CHECK_ITEM_NUM];
 static int gMode[CHANNEL_NUM];
 
@@ -61,11 +64,62 @@ static char gIsFirst[CHANNEL_NUM] = { 0 };
 
 static int gIsInitialized = 0;
 
-
 static const int MODE_MAX = 2;
 void setArcfaultAlarmMode(int channel, int mode) {
     if (mode >= 0 && mode <= MODE_MAX) {
         gMode[channel] = mode;
+    }
+    switch (mode) {
+    case ARCFAULT_SENSITIVITY_HIGH:
+        gDelayCheckTime =0;
+        gMinExtremeDis = 15; //越大越严
+        gMinWidth = 30; // 阻性电弧发生点最少宽度
+        gResJumpRatio = 2.8f;
+        gAlarmThresh = 10;
+        gDutyRatioThresh = 200;
+        gArc2NumRatioThresh = 200;
+        gMaxSeriesThresh = 200;
+        gResFollowJumpMaxRatio = 3.2f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
+        gInductJumpRatio = 3.0f; // 感性负载最少跳变threshDelta的倍数
+        gResJumpThresh = 0.9f; // 阻性负载最小跳跃幅度，单位A
+        gInductJumpThresh = 2.0f; // 感性负载最小跳跃幅度，单位A
+        gInductMaxJumpRatio = 0.40; // 越大越严，感性负载跳变值至少满足电流峰值的百分比，取50%低一点的值
+        gInductJumpMinThresh = 0.70f; // 越大越严，感性负载待验证跳变值至少满足最大跳变值得百分比
+        break;
+    case ARCFAULT_SENSITIVITY_MEDIUM:
+        gDelayCheckTime = 1000 / 20;
+        gMinExtremeDis = 19;
+        gMinWidth = 35;
+        gResJumpRatio = 3.5f;
+        gAlarmThresh = 14;
+        gDutyRatioThresh = 92;
+        gArc2NumRatioThresh = 40;
+        gMaxSeriesThresh = 25;
+        gResFollowJumpMaxRatio = 3.5f;
+        gInductJumpRatio = 3.3f;
+        gResJumpThresh = 1.0f;
+        gInductJumpThresh = 2.5;
+        gInductMaxJumpRatio = 0.462;
+        gInductJumpMinThresh = 0.75f;
+        break;
+    case ARCFAULT_SENSITIVITY_LOW:
+        gDelayCheckTime = 1000 / 20;
+        gMinExtremeDis = 20;
+        gMinWidth = 36;
+        gResJumpRatio = 4.0f;
+        gAlarmThresh = 14;
+        gDutyRatioThresh = 90;
+        gArc2NumRatioThresh = 35;
+        gMaxSeriesThresh = 20;
+        gResFollowJumpMaxRatio = 3.8f;
+        gInductJumpRatio = 3.8f;
+        gResJumpThresh = 1.5f;
+        gInductJumpThresh = 3.0f;
+        gInductMaxJumpRatio = 0.47f;
+        gInductJumpMinThresh = 0.8f;
+        break;
+    default:
+        break;
     }
 }
 
@@ -266,7 +320,7 @@ int initFuncArcfault(void) {
     for (int i = 0; i < CHANNEL_NUM; i++) {
         gStatus[i] = STATUS_NORMAL;
         gIsFirst[i] = 1;
-        gCheckEnabled[i]=1;
+        gCheckEnabled[i] = 1;
         gMode[i] = ARCFAULT_SENSITIVITY_MEDIUM;
     }
 
@@ -336,7 +390,7 @@ int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, i
     if (maxD1abs > threshDelta * gResJumpRatio && maxD1abs > gResJumpThresh) {
         pBigJumpCounter[channel]++;
     }
-    if (health >= 76.0f && effValue >= 1.5f) {
+    if (health >= 76.0f && effValue >= gMinCurrent && effValue <= gMaxCurrent) {
         // 最后3个点的电弧信息缺少，容易误判，忽略
         const int PARTIAL_MAX_INDEX = 3;
         for (int i = 1; i < 128 - PARTIAL_MAX_INDEX; i++) {
@@ -672,4 +726,10 @@ void setArcCheckDisabled(int item) {
 
 void setArcOverlayCheckEnabled(char enable) {
     gOverlayCheckEnabled = enable;
+}
+
+void setArcCurrentRange(float minCurrent, float maxCurrent) {
+
+    gMinCurrent = minCurrent;
+    gMaxCurrent = maxCurrent;
 }

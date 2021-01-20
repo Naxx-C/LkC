@@ -97,7 +97,11 @@ void getX(int **y) {
 }
 
 const char *APP_BUILD_DATE = __DATE__;
+extern void setArcCurrentRange(float minCurrent, float maxCurrent);
+
 int main() {
+    printf("%d\n",getAlgoVersion());
+    setArcCurrentRange(1.0f, 4.0f);
     algo_set_test();
     return 0;
 

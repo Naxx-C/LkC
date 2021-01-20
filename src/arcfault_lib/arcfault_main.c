@@ -70,18 +70,36 @@ static int parse(char *csvPath, int offset, float *currents, int len) {
 //char *dirPath = "F:\\data\\ArcfaultData\\20200410\\2kw_alarm_fail";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200410\\1kw_arc_alarm_fail";
 //char *dirPath = "F:\\data\\ArcfaultData\\20200410\\cleaner_arc_alarm_normal";
-static char *dirPath = "F:\\data\\ArcfaultData\\20200410\\clearner_res_alarm_normal";
-static const int CHANNEL = 3;
+//static char *dirPath = "F:\\data\\ArcfaultData\\20200410\\clearner_res_alarm_normal";
+static char *dirPath = "F:\\data\\ArcfaultData\\youchu_falsealarm";
+static const int CHANNEL = 1;
+const char *APP_BUILD_DATE = __DATE__;
 
-int arcfault_main() {
+float gTestArcBuff[128] = { -1.1566077, -0.5783039, 0, 0.86745584, 1.7349117, 2.8915193, 4.626431, 5.4938865,
+        6.6504946, 9.831166, 10.987773, 10.987773, 10.40947, 9.542014, 9.831166, 10.40947, 11.855229,
+        12.722686, 13.590142, 15.0359, 16.48166, 17.63827, 17.059965, 16.48166, 15.903357, 17.059965,
+        21.397243, 21.975546, 23.710459, 23.421307, 22.843004, 24.288763, 24.867067, 24.867067, 25.445372,
+        25.156218, 25.445372, 24.288763, 23.421307, 23.421307, 23.421307, 23.999613, 23.999613, 24.288763,
+        21.397243, 19.951483, 19.662333, 21.108091, 20.529787, 19.951483, 19.37318, 18.505724, 17.059965,
+        16.192509, 16.770813, 16.770813, 16.192509, 15.0359, 13.011838, 11.855229, 10.987773, 10.698622,
+        10.40947, 9.831166, 8.96371, 7.228799, 6.361343, 5.4938865, 4.915583, 3.4698234, 2.0240636,
+        0.28915194, -0.5783039, -3.1806715, -3.4698234, -3.1806715, -2.8915193, -3.4698234, -3.4698234,
+        -4.048127, -4.915583, -4.915583, -5.4938865, -5.7830386, -6.0721908, -5.7830386, -5.7830386,
+        -4.915583, -4.626431, -6.361343, -6.9396467, -8.674558, -12.1443815, -14.457598, -14.746749,
+        -14.168445, -13.011838, -13.300989, -13.300989, -14.168445, -14.457598, -14.168445, -14.168445,
+        -13.300989, -13.590142, -13.300989, -14.168445, -13.590142, -13.011838, -11.276926, -10.987773,
+        -12.433534, -12.1443815, -11.276926, -11.276926, -10.698622, -9.252862, -8.96371, -8.674558, -8.96371,
+        -8.96371, -7.807102, -6.6504946, -6.0721908, -5.204735, -4.337279, -4.337279, -2.8915193 };
+
+int main() {
     setArcAlarmThresh(14);
     setArcFftEnabled(0);
     arcAlgoInit(CHANNEL);
     // ArcFaultAlgo.setArcResJumpThresh(0.9f);
     // ArcFaultAlgo.setArcCheckDisabled(ArcFaultAlgo.ARC_CON_POSJ);
-    setArcCheckDisabled(ARC_CON_PREJ); // Cleaner_Resistor must be
-    setArcCheckDisabled(ARC_CON_POSJ);
-    setArcOverlayCheckEnabled(1);
+//    setArcCheckDisabled(ARC_CON_PREJ); // Cleaner_Resistor must be
+//    setArcCheckDisabled(ARC_CON_POSJ);
+//    setArcOverlayCheckEnabled(1);
 
     //灵敏版参数
     //    setArcResJumpRatio(2.5f);
@@ -140,7 +158,8 @@ int arcfault_main() {
                     memset(outArcNum, 0, sizeof(int) * CHANNEL);
                     for (int channel = 0; channel < CHANNEL; channel++) {
 
-                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
+//                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
+                        char alarm = arcAnalyze(channel, gTestArcBuff, 128, &(arcNum1s[channel]),
                                 &(outArcNum[channel]));
 
                         alarmNum[channel] += alarm;

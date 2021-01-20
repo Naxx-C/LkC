@@ -21,12 +21,15 @@
 //static char *onePath = "F:\\Tmp\\dingpinkongtiao";
 //static char *onePath = "F:\\Tmp\\tiaoyawubao";
 //static char *onePath = "F:\\Tmp\\fail";
-static char gDirs[][100] = { "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charginglk2",
-        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
-        "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
-        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
-        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
-        "F:\\Tmp\\charging_medium_lowratelk2","F:\\Tmp\\labtoplk2" };
+static char gDirs[][100] = {
+//        "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charginglk2",
+//        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
+//        "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
+//        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
+//        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
+//        "F:\\Tmp\\charging_medium_lowratelk2",
+        "F:\\Tmp\\labtop"
+        };
 
 static int init() {
 
@@ -80,6 +83,23 @@ static int init() {
 //    };
 //}
 
+static float gSimulatedData[128] = { -2.8915193, -2.3132155, -2.3132155, -2.3132155, -2.0240636, -2.0240636,
+        -2.0240636, -1.7349117, -1.7349117, -2.0240636, -1.7349117, -2.0240636, -1.4457597, -1.7349117,
+        -1.7349117, -1.7349117, -1.4457597, -1.7349117, -1.4457597, -1.1566077, -1.1566077, -0.28915194,
+        6.361343, 9.831166, 11.276926, 13.300989, 16.192509, 18.505724, 18.794876, 17.349115, 13.590142,
+        9.542014, 6.361343, 4.626431, 4.048127, 4.048127, 4.337279, 3.758975, 3.1806715, 2.8915193, 1.4457597,
+        0, -1.4457597, -1.1566077, -1.7349117, -1.4457597, -1.7349117, -1.1566077, -1.1566077, -1.4457597,
+        -1.4457597, -1.7349117, -1.7349117, -2.0240636, -1.4457597, -2.0240636, -2.0240636, -2.0240636,
+        -2.0240636, -2.0240636, -2.0240636, -2.0240636, -2.0240636, -2.3132155, -1.7349117, -2.0240636,
+        -2.6023674, -2.6023674, -2.3132155, -2.6023674, -2.3132155, -2.6023674, -2.6023674, -2.6023674,
+        -2.6023674, -2.6023674, -2.6023674, -2.6023674, -2.6023674, -3.1806715, -2.8915193, -2.6023674,
+        -2.8915193, -3.1806715, -3.1806715, -4.915583, -10.987773, -13.590142, -15.614204, -17.92742,
+        -21.108091, -23.132154, -23.132154, -21.108091, -18.505724, -14.168445, -11.276926, -9.252862,
+        -8.3854065, -8.674558, -8.96371, -8.3854065, -7.807102, -7.228799, -6.0721908, -3.758975, -3.1806715,
+        -2.8915193, -2.6023674, -2.6023674, -2.8915193, -2.8915193, -3.1806715, -2.8915193, -2.3132155,
+        -2.6023674, -2.6023674, -2.3132155, -2.6023674, -2.8915193, -2.6023674, -2.6023674, -2.6023674,
+        -2.6023674, -2.3132155, -2.8915193, -2.3132155, -2.6023674 };
+
 int algo_set_test() {
 
 //    printf("%d\n", sizeof(gDirs) / 100);
@@ -130,7 +150,9 @@ int algo_set_test() {
                     fileIndex++;
                     i++;
                     if (i >= 128) {
-                        feedData(dirIndex % CHANNEL_NUM, current, voltage, time(NULL), NULL);
+//                        feedData(dirIndex % CHANNEL_NUM, current, voltage, time(NULL), NULL);
+                        setMaxChargingDevicePower(0, 5000);
+                        feedData(dirIndex % CHANNEL_NUM, gSimulatedData, voltage, time(NULL), NULL);
                         i = 0;
                     }
                     pointNum++;
