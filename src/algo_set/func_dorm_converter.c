@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <math.h>
 
-static int gMode[CHANNEL_NUM];
+static int gSensitivity[CHANNEL_NUM];
 static float gPresetMinPower[CHANNEL_NUM];
 static float gPresetMaxPower[CHANNEL_NUM];
 
@@ -20,7 +20,7 @@ void setMaxDormConverterPower(int channel, float power) {
 int initFuncDormConverter(void) {
 
     for (int i = 0; i < CHANNEL_NUM; i++) {
-        gMode[i] = DORM_CONVERTER_SENSITIVITY_MEDIUM;
+        gSensitivity[i] = DORM_CONVERTER_SENSITIVITY_MEDIUM;
         gPresetMinPower[i] = -1;
         gPresetMaxPower[i] = -1;
     }
@@ -35,7 +35,7 @@ int dormConverterAdjustingCheck(int channel, float activePower, float reactivePo
     float minActivePower = 150, minReactivePower = 150, maxActivePower = 3000;
     float minDeltaRatio = 0.8f;
 
-    switch (gMode[channel]) {
+    switch (gSensitivity[channel]) {
     case DORM_CONVERTER_SENSITIVITY_LOW: //低灵敏度
         minExtreme = 2; //越大越严
         maxExtreme = 2; //越小越严
@@ -90,7 +90,7 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
     float minActivePower = 100, minReactivePower = 100;
     float minDeltaRatio = 0.8f;
 
-    switch (gMode[channel]) {
+    switch (gSensitivity[channel]) {
     case DORM_CONVERTER_SENSITIVITY_LOW: //低灵敏度
         minExtreme = 2; //越大越严
         maxExtreme = 2; //越小越严
@@ -150,12 +150,12 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
 }
 
 static const int MODE_MAX = 2;
-void setDormConverterAlarmMode(int channel, int mode) {
-    if (mode >= -1 && mode <= MODE_MAX) {
-        gMode[channel] = mode;
+void setDormConverterAlarmSensitivity(int channel, int sensitivity) {
+    if (sensitivity >= -1 && sensitivity <= MODE_MAX) {
+        gSensitivity[channel] = sensitivity;
     }
 }
 
-int getDormConverterAlarmMode(int channel) {
-    return gMode[channel];
+int getDormConverterAlarmSensitivity(int channel) {
+    return gSensitivity[channel];
 }

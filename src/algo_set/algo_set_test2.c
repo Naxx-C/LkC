@@ -23,8 +23,8 @@ static int init() {
     setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {
-        setChargingAlarmMode(channel, CHARGING_ALARM_SENSITIVITY_MEDIUM);
-        setMaliLoadAlarmMode(channel, MALI_LOAD_SENSITIVITY_HIGH);
+        setChargingAlarmSensitivity(channel, CHARGING_ALARM_SENSITIVITY_MEDIUM);
+        setMaliLoadAlarmSensitivity(channel, MALI_LOAD_SENSITIVITY_HIGH);
         setMinEventDeltaPower(channel, 55);
         setMinChargingDevicePower(channel, 55);
     }

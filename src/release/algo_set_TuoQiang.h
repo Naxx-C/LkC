@@ -103,8 +103,6 @@ void startArcLearning(int channel);
 void stopArcLearning(int channel);
 //清除本机所有学习的结果(不分通道)
 void clearArcLearningResult(void);
-//获取学习模式剩余学习时间,单位s
-int getArcLearningRemainingTime(int channel);
 //其他非常用配置
 void setArcMinWidth(int minWidth);
 void setArcCurrentRange(float minCurrent, float maxCurrent);//默认[1.5A-100A]

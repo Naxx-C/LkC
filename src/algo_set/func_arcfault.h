@@ -43,6 +43,8 @@ void setArcfaultSensitivity(int channel, int sensitivity);
 //设置场景适应性学习时长，默认3天
 void setArcLearningTime(int channel, int learningTime);
 void startArcLearning(int channel);
+void stopArcLearning(int channel);
+void clearArcLearningResult(void);
 
 //智能模式使能,默认打开为SMARTMODE_STANDARD. 如演示等非正常环境使用时,建议临时关闭
 #define ARCFAULT_SMARTMODE_OFF 0

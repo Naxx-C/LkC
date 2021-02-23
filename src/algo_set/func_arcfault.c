@@ -828,10 +828,18 @@ void setArcLearningTime(int channel, int learningTime) {
     gSmartmodeLearningTimeSet[channel] = learningTime;
 }
 
+int getArcLearningRemainingTime(int channel) {
+    return gSmartmodeLearningTime[channel];
+}
+
 void startArcLearning(int channel) {
     gSmartmodeLearningTime[channel] = gSmartmodeLearningTimeSet[channel];
 }
 
 void stopArcLearning(int channel) {
     gSmartmodeLearningTime[channel] = 0;
+}
+
+void clearArcLearningResult(void) {
+    ClearArcFeature();
 }

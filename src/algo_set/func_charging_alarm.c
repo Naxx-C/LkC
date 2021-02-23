@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <math.h>
 
-static int gMode[CHANNEL_NUM];
+static int gSensitivity[CHANNEL_NUM];
 static float gPresetMinPower[CHANNEL_NUM]; //-1表示未配置
 static float gPresetMaxPower[CHANNEL_NUM];
 
@@ -22,7 +22,7 @@ void setMaxChargingDevicePower(int channel, float power) {
 int initFuncChargingAlarm(void) {
 
     for (int i = 0; i < CHANNEL_NUM; i++) {
-        gMode[i] = CHARGING_ALARM_SENSITIVITY_MEDIUM;
+        gSensitivity[i] = CHARGING_ALARM_SENSITIVITY_MEDIUM;
         gPresetMinPower[i] = -1;
         gPresetMaxPower[i] = -1;
     }
@@ -61,7 +61,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
     float minActivePower = 85, minReactivePower = 100, maxActivePower = 280;
     float maxDeltaRatio = 0.8f;
 
-    switch (gMode[channel]) {
+    switch (gSensitivity[channel]) {
     case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
         pulseIThresh = 2.0f; //越大越严
         thetaThresh = 10; //越小越严
@@ -155,7 +155,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
 
     //极值点左右点数
     int checkPass = 1;
-    switch (gMode[channel]) {
+    switch (gSensitivity[channel]) {
     case CHARGING_ALARM_SENSITIVITY_HIGH:
         checkPass = 1;
         break;
@@ -187,14 +187,14 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
 }
 
 static const int MODE_MAX = 2;
-void setChargingAlarmMode(int channel, int mode) {
-    if (mode >= -1 && mode <= MODE_MAX) {
-        gMode[channel] = mode;
+void setChargingAlarmSensitivity(int channel, int sensitivity) {
+    if (sensitivity >= -1 && sensitivity <= MODE_MAX) {
+        gSensitivity[channel] = sensitivity;
     }
 }
 
-int getChargingAlarmMode(int channel) {
-    return gMode[channel];
+int getChargingAlarmSensitivity(int channel) {
+    return gSensitivity[channel];
 }
 
 int similarityTest(void) {

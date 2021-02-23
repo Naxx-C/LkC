@@ -21,7 +21,7 @@
 #endif
 
 /**固定定义区*/
-const static char VERSION[] = { 1, 0, 0, 2 };
+const static char VERSION[] = { 1, 0, 0, 3 };
 static const int B_MAX[3] = { 2021, 12, 30 }; //最大允许集成编译时间,其他地方是障眼法
 
 /**运行变量区*/
@@ -618,8 +618,6 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         gDormConverterAlarm[channel] = 0;
         gMaliLoadAlarm[channel] = 0;
         gArcfaultAlarm[channel] = 0;
-        if (ds.mday == 15 && ds.hour == 10)
-            gMaliLoadAlarm[channel] = 1;
         return 2;
     }
 
@@ -635,19 +633,11 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     }
 
     if (DEBUG_ONLY) {
-        gArcfaultAlarm[channel] = 0;
-        if (gTimer[channel] > 30240000) {
-            DateStruct ds;
-            getDateByTimestamp(unixTimestamp, &ds);
-            gMaliLoadAlarm[channel] = 0;
-            gDormConverterAlarm[channel] = 0;
+        if (gTimer[channel]  >= 50 * 86400 * 2) {
             gChargingAlarm[channel] = 0;
-            if (ds.wday == 6 && ds.hour == 6 && ds.sec == 6) {
-                gArcfaultAlarm[channel] = 1;
-            }
-            if (ds.wday == 5 && ds.hour == 5 && ds.sec == 5) {
-                gMaliLoadAlarm[channel] = 1;
-            }
+            gDormConverterAlarm[channel] = 0;
+            gMaliLoadAlarm[channel] = 0;
+            gArcfaultAlarm[channel] = 0;
             return 4;
         }
     }
@@ -704,7 +694,7 @@ int initTpsonAlgoLib(void) {
     memset(gLastPowercostUpdateTime, 0, sizeof(gLastPowercostUpdateTime));
     memset(gLastActivePower, 0, sizeof(gLastActivePower));
 
-    //step:初始化算法模块
+//step:初始化算法模块
     initFuncArcfault();
     initFuncDormConverter();
     initFuncMaliLoad();

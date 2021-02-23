@@ -14,8 +14,8 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
 #define CHARGING_ALARM_SENSITIVITY_LOW 0
 #define CHARGING_ALARM_SENSITIVITY_MEDIUM 1
 #define CHARGING_ALARM_SENSITIVITY_HIGH 2
-void setChargingAlarmMode(int channel, int mode);
-int getChargingAlarmMode(int channel);
+void setChargingAlarmSensitivity(int channel, int mode);
+int getChargingAlarmSensitivity(int channel);
 
 //init ok: return 0
 int initFuncChargingAlarm(void);

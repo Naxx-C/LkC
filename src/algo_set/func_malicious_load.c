@@ -9,15 +9,15 @@
 #include <stdio.h>
 
 static const int MODE_MAX = 2;
-static int gMode[CHANNEL_NUM];
-void setMaliLoadAlarmMode(int channel, int mode) {
-    if (mode >= -1 && mode <= MODE_MAX) {
-        gMode[channel] = mode;
+static int gSensitivity[CHANNEL_NUM];
+void setMaliLoadAlarmSensitivity(int channel, int sensitivity) {
+    if (sensitivity >= -1 && sensitivity <= MODE_MAX) {
+        gSensitivity[channel] = sensitivity;
     }
 }
 
-int getMaliLoadAlarmMode(int channel) {
-    return gMode[channel];
+int getMaliLoadAlarmSensitivity(int channel) {
+    return gSensitivity[channel];
 }
 
 #define POWER_WHITELIST_SIZE 10
@@ -40,7 +40,7 @@ void setMaliLoadMinPower(int channel, float minPower) {
 int initFuncMaliLoad(void) {
 
     for (int i = 0; i < CHANNEL_NUM; i++) {
-        gMode[i] = MALI_LOAD_SENSITIVITY_MEDIUM;
+        gSensitivity[i] = MALI_LOAD_SENSITIVITY_MEDIUM;
         gPowerMinRatio[i] = 0.9f;
         gPowerMaxRatio[i] = 1.1f;
         gMinPower[i] = 200;
@@ -133,7 +133,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
 
     int minFlatNum = 15;
     float minPf = 0.97f, maxPulseI = 1.09f, minFft1d3 = 18, maxHarmRatio = 0.1f, minAcReactivePower = 200;
-    switch (gMode[channel]) {
+    switch (gSensitivity[channel]) {
     case MALI_LOAD_SENSITIVITY_LOW: //低灵敏度
         minPf = 0.985f; //越大越严
         minFlatNum = 15; //越大越严
