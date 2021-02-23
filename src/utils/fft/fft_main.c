@@ -1,8 +1,8 @@
 #include "zx_fft.h"
 //https://github.com/xiahouzuoxin/fft
 #define  SAMPLE_NODES              (128)
-#define LOG_ON 0
-COMPLEX x[SAMPLE_NODES];
+#define FFT_LOG_ON 0
+static COMPLEX x[SAMPLE_NODES];
 
 static void MakeInput() {
     int i;
@@ -29,7 +29,7 @@ int fft_main(void) {
     MakeInput();
     fft(x, SAMPLE_NODES);
 
-#if LOG_ON == 1
+#if FFT_LOG_ON == 1
     printf("\nfft\n");
     for (i = 0; i < SAMPLE_NODES; i++) {
         printf("%.5f %.5f %.5f\n", x[i].real, x[i].imag,
@@ -39,7 +39,7 @@ int fft_main(void) {
     printf("\nifft\n");
 #endif
     ifft(x, SAMPLE_NODES);
-#if LOG_ON == 1
+#if FFT_LOG_ON == 1
     for (i = 0; i < SAMPLE_NODES; i++) {
         printf("%.5f %.5f %.5f\n", x[i].real, x[i].imag,
                 sqrt(x[i].real * x[i].real + x[i].imag * x[i].imag) / (SAMPLE_NODES / 2));
@@ -48,12 +48,12 @@ int fft_main(void) {
 
     /* TEST FFT with REAL INPUTS */
     MakeInput();
-#if LOG_ON == 1
+#if FFT_LOG_ON == 1
     printf("\nfft_real\n");
 #endif
     fft_real(x, SAMPLE_NODES);
 
-#if LOG_ON == 1
+#if FFT_LOG_ON == 1
     for (i = 0; i < SAMPLE_NODES; i++) {
         printf("%.5f %.5f %.5f\n", x[i].real, x[i].imag,
                 sqrt(x[i].real * x[i].real + x[i].imag * x[i].imag) / (SAMPLE_NODES / 2));
@@ -62,7 +62,7 @@ int fft_main(void) {
     printf("\nifft_real\n");
 #endif
     ifft_real(x, SAMPLE_NODES);
-#if LOG_ON == 1
+#if FFT_LOG_ON == 1
     for (i = 0; i < SAMPLE_NODES; i++) {
         printf("%.5f %.5f %.5f\n", x[i].real, x[i].imag,
                 sqrt(x[i].real * x[i].real + x[i].imag * x[i].imag) / (SAMPLE_NODES / 2));
@@ -86,12 +86,12 @@ int fft_main(void) {
 
 
     MakeInputLk(f);
-#if LOG_ON == 1
+#if FFT_LOG_ON == 1
     printf("\nfft_real\n");
 #endif
     fft(x, SAMPLE_NODES);
 
-#if LOG_ON == 1
+#if FFT_LOG_ON == 1
     for (i = 0; i < SAMPLE_NODES; i++) {
         printf("%.5f %.5f %.5f\n", x[i].real, x[i].imag,
                 sqrt(x[i].real * x[i].real + x[i].imag * x[i].imag) / (SAMPLE_NODES / 2));

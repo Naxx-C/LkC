@@ -39,6 +39,7 @@ void setArcInductMaxJumpRatio(float inductMaxJumpRatio);
 void setArcInductJumpMinThresh(float inductJumpMinThresh);
 void setArcFftEnabled(char fftEnabled);
 void setArcOverlayCheckEnabled(char enable);
+void setArcCurrentRange(float minCurrent, float maxCurrent);
 int arcAlgoStatus(void);
 #define ARC_CON_PREJ 1
 #define ARC_CON_PN 2
@@ -49,6 +50,10 @@ int arcAlgoStatus(void);
 #define ARC_CON_BJ 7
 #define ARC_CON_POSJ 8
 void setArcCheckDisabled(int item);
+#define ARCFAULT_SENSITIVITY_LOW 0
+#define ARCFAULT_SENSITIVITY_MEDIUM 1
+#define ARCFAULT_SENSITIVITY_HIGH 2
+void setArcfaultAlarmMode(int mode);
 /**
  * @param channelNum
  *            channel num, must be <= 8

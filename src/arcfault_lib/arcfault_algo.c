@@ -9,7 +9,7 @@
 /**
  * 可配区
  */
-static const char VERSION[] = { 1, 0, 0, 0 };
+static const char VERSION[] = { 1, 0, 0, 2 };
 static int gMinExtremeDis = 19; // 阻性电弧发生点到极值的最小距离
 static int gMinWidth = 35; // 阻性电弧发生点最少宽度
 static int gDelayCheckTime = 1000 / 20; // 延迟报警时间
@@ -27,6 +27,8 @@ static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至�
 static char gFftEnabled = 0;
 static char gOverlayCheckEnabled = 0;
 static char gCheckEnabled[CHECK_ITEM_NUM];
+static float gMaxCurrent = 100.0f;
+static float gMinCurrent = 1.5f;
 
 /**
  * 自用区
@@ -61,7 +63,7 @@ static char *gIsFirst = NULL;
 
 extern char *APP_BUILD_DATE;
 char gIsLibExpired = 1;
-const char *EXPIRED_DATE = "2020-12-30";
+const char *EXPIRED_DATE = "2021-12-30";
 // prebuiltDate sample "Mar 03 2020"
 int isExpired(const char *prebuiltDate, const char *expiredDate) {
     if (prebuiltDate == NULL || expiredDate == NULL)
@@ -90,6 +92,60 @@ int isExpired(const char *prebuiltDate, const char *expiredDate) {
 
 int arcAlgoStatus() {
     return gIsLibExpired;
+}
+void setArcfaultAlarmMode(int mode) {
+    switch (mode) {
+    case ARCFAULT_SENSITIVITY_HIGH:
+        gDelayCheckTime = 0;
+        gMinExtremeDis = 15; //越大越严
+        gMinWidth = 30; // 阻性电弧发生点最少宽度
+        gResJumpRatio = 2.8f;
+        gAlarmThresh = 10;
+        gDutyRatioThresh = 200;
+        gArc2NumRatioThresh = 200;
+        gMaxSeriesThresh = 200;
+        gResFollowJumpMaxRatio = 3.2f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
+        gInductJumpRatio = 3.0f; // 感性负载最少跳变threshDelta的倍数
+        gResJumpThresh = 0.9f; // 阻性负载最小跳跃幅度，单位A
+        gInductJumpThresh = 2.0f; // 感性负载最小跳跃幅度，单位A
+        gInductMaxJumpRatio = 0.40; // 越大越严，感性负载跳变值至少满足电流峰值的百分比，取50%低一点的值
+        gInductJumpMinThresh = 0.70f; // 越大越严，感性负载待验证跳变值至少满足最大跳变值得百分比
+        break;
+    case ARCFAULT_SENSITIVITY_MEDIUM:
+        gDelayCheckTime = 1000 / 20;
+        gMinExtremeDis = 19;
+        gMinWidth = 35;
+        gResJumpRatio = 3.5f;
+        gAlarmThresh = 14;
+        gDutyRatioThresh = 92;
+        gArc2NumRatioThresh = 40;
+        gMaxSeriesThresh = 25;
+        gResFollowJumpMaxRatio = 3.5f;
+        gInductJumpRatio = 3.3f;
+        gResJumpThresh = 1.0f;
+        gInductJumpThresh = 2.5;
+        gInductMaxJumpRatio = 0.52;
+        gInductJumpMinThresh = 0.75f;
+        break;
+    case ARCFAULT_SENSITIVITY_LOW:
+        gDelayCheckTime = 1000 / 20;
+        gMinExtremeDis = 20;
+        gMinWidth = 36;
+        gResJumpRatio = 4.0f;
+        gAlarmThresh = 14;
+        gDutyRatioThresh = 90;
+        gArc2NumRatioThresh = 35;
+        gMaxSeriesThresh = 20;
+        gResFollowJumpMaxRatio = 3.8f;
+        gInductJumpRatio = 3.8f;
+        gResJumpThresh = 1.5f;
+        gInductJumpThresh = 3.0f;
+        gInductMaxJumpRatio = 0.7f;
+        gInductJumpMinThresh = 0.8f;
+        break;
+    default:
+        break;
+    }
 }
 
 //初始化
@@ -165,13 +221,14 @@ int arcAlgoInit(int channelNum) {
     gIsFirst = (char*) malloc(sizeof(char) * gChannelNum);
     memset(gIsFirst, 1, sizeof(char) * gChannelNum);
 
-
     memset(gCheckEnabled, 1, sizeof(char) * CHECK_ITEM_NUM);
 
     //内存分配失败
     if (gIsFirst == NULL)
         return -1;
 
+    if (gIsLibExpired)
+        return 2;
     return 0;
 }
 
@@ -248,7 +305,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
     if (maxD1abs > threshDelta * gResJumpRatio && maxD1abs > gResJumpThresh) {
         pBigJumpCounter[channel]++;
     }
-    if (health >= 76.0f && effValue >= 1.5f) {
+    if (health >= 76.0f && effValue >= gMinCurrent && effValue <= gMaxCurrent) {
         // 最后3个点的电弧信息缺少，容易误判，忽略
         const int PARTIAL_MAX_INDEX = 3;
         for (int i = 1; i < length - PARTIAL_MAX_INDEX; i++) {
@@ -488,7 +545,7 @@ int arcAnalyzeInner(int channel, float *current, const int length, float effCurr
             }
             gWatingTime[channel] = gTimer[channel];
             gStatus[channel] = STATUS_WAITING_CHECK;
-            gArcNumAlarming[channel] = arcNum1S;                        // 记录当前电弧数目，留做报警时传递
+            gArcNumAlarming[channel] = arcNum1S; // 记录当前电弧数目，留做报警时传递
         }
         break;
     case STATUS_WAITING_CHECK:
@@ -597,4 +654,10 @@ void setArcOverlayCheckEnabled(char enable) {
 
 int getArcAlgoVersion() {
     return VERSION[0] << 24 | VERSION[1] << 16 | VERSION[2] << 8 | VERSION[3];
+}
+
+void setArcCurrentRange(float minCurrent, float maxCurrent) {
+
+    gMinCurrent = minCurrent;
+    gMaxCurrent = maxCurrent;
 }

@@ -71,7 +71,7 @@ void scale(TYPE_SCALE x[],
  * @output params
  * @retval
  */
-float cabs(COMPLEX x)
+float fft_cabs(COMPLEX x)
 {
     float mag = 0.0f;
 

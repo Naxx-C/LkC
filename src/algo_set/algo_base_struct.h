@@ -17,12 +17,14 @@ typedef struct {
     float maxValue;//最大值
 } WaveFeature;
 
+#pragma pack(1)
 typedef struct {
 
     float activePower; // powerline's total power, adjusted by voltage
     float reactivePower;
     float totalPowerCost;
     int sampleTime; // in second
-} __attribute__ ((packed)) PowerTrack;
+} PowerTrack;
+#pragma pack()
 
 #endif /* ALGO_BASE_STRUCT_H_ */

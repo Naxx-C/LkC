@@ -13,4 +13,7 @@
 //#define PLATFORM_ "ARM"
 //#define PLATFORM_ "LINUX"
 
+#define LOG_ON 0
+#define DEBUG_ONLY 0
+
 #endif /* ALGO_SET_ALGO_SET_H_ */

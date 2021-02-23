@@ -2,6 +2,9 @@
 #include "power_utils.h"
 #include "math_utils.h"
 #include "algo_set_build.h"
+#include "data_structure_utils.h"
+#include "arcfault_smartmode.h"
+#include "time_utils.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,7 +26,7 @@ static float gResFollowJumpMaxRatio = 3.5f; // 阻性负载跳变发生处,后�
 static float gInductJumpRatio = 3.3f; // 感性负载最少跳变threshDelta的倍数
 static float gResJumpThresh = 1.0f; // 阻性负载最小跳跃幅度，单位A
 static float gInductJumpThresh = 2.5; // 阻性负载最小跳跃幅度，单位A
-static float gInductMaxJumpRatio = 0.462; // 感性负载跳变值至少满足电流峰值的百分比，取50%低一点的值
+static float gInductMaxJumpRatio = 0.52; // 感性负载跳变值至少满足电流峰值的百分比
 static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至少满足最大跳变值得百分比
 static char gFftEnabled = 0;
 static char gOverlayCheckEnabled = 0;
@@ -31,7 +34,11 @@ static float gMaxCurrent = 100.0f;
 static float gMinCurrent = 1.5f;
 
 static char gCheckEnabled[CHECK_ITEM_NUM];
-static int gMode[CHANNEL_NUM];
+static int gSensitivity[CHANNEL_NUM];
+
+static int gSmartmodeLearningTime[CHANNEL_NUM] = { 0 };
+static int gSmartmodeLearningTimeSet[CHANNEL_NUM] = { 0 };
+static int gSmartMode[CHANNEL_NUM];
 
 /**
  * 自用区
@@ -45,7 +52,6 @@ int pAlarmCounter[CHANNEL_NUM] = { 0 }; // 报警计数器
 static int gWatingTime[CHANNEL_NUM] = { 0 };
 static int gTimer[CHANNEL_NUM] = { 0 };
 const int ONE_EIGHT_PERIOD = 16; // 8分之1周期
-const char LOG_ON = 1;
 
 static int gStatus[CHANNEL_NUM] = { 0 };
 static int gArcNumAlarming[CHANNEL_NUM] = { 0 }; // 报警发生时的电弧数目
@@ -64,14 +70,21 @@ static char gIsFirst[CHANNEL_NUM] = { 0 };
 
 static int gIsInitialized = 0;
 
+static int gLastAuditAlarmTime[CHANNEL_NUM] = { 0 };
+static char gSmartmodeTimeTrigger[CHANNEL_NUM][24] = { 0 }; //24h内有4次触发(1个小时内重复触发不计)
+static int gSmartmodeNumTrigger[CHANNEL_NUM] = { 0 }; //连续2分钟内有38*60*2次触发
+static char gSmartmodeNumTriggerMissedCounter[CHANNEL_NUM] = { 0 }; //连续2分钟内有38*60*2次触发
+static int HOUR = 3600;
+static int DAY = 3600 * 24;
+
 static const int MODE_MAX = 2;
-void setArcfaultAlarmMode(int channel, int mode) {
-    if (mode >= 0 && mode <= MODE_MAX) {
-        gMode[channel] = mode;
+void setArcfaultSensitivity(int channel, int sensitivity) {
+    if (sensitivity >= 0 && sensitivity <= MODE_MAX) {
+        gSensitivity[channel] = sensitivity;
     }
-    switch (mode) {
+    switch (sensitivity) {
     case ARCFAULT_SENSITIVITY_HIGH:
-        gDelayCheckTime =0;
+        gDelayCheckTime = 0;
         gMinExtremeDis = 15; //越大越严
         gMinWidth = 30; // 阻性电弧发生点最少宽度
         gResJumpRatio = 2.8f;
@@ -99,7 +112,7 @@ void setArcfaultAlarmMode(int channel, int mode) {
         gInductJumpRatio = 3.3f;
         gResJumpThresh = 1.0f;
         gInductJumpThresh = 2.5;
-        gInductMaxJumpRatio = 0.462;
+        gInductMaxJumpRatio = 0.52;
         gInductJumpMinThresh = 0.75f;
         break;
     case ARCFAULT_SENSITIVITY_LOW:
@@ -115,7 +128,7 @@ void setArcfaultAlarmMode(int channel, int mode) {
         gInductJumpRatio = 3.8f;
         gResJumpThresh = 1.5f;
         gInductJumpThresh = 3.0f;
-        gInductMaxJumpRatio = 0.47f;
+        gInductMaxJumpRatio = 0.7f;
         gInductJumpMinThresh = 0.8f;
         break;
     default:
@@ -321,7 +334,10 @@ int initFuncArcfault(void) {
         gStatus[i] = STATUS_NORMAL;
         gIsFirst[i] = 1;
         gCheckEnabled[i] = 1;
-        gMode[i] = ARCFAULT_SENSITIVITY_MEDIUM;
+        gSensitivity[i] = ARCFAULT_SENSITIVITY_MEDIUM;
+        gSmartMode[i] = ARCFAULT_SMARTMODE_ON;
+        gSmartmodeLearningTime[i] = 0;
+        gSmartmodeLearningTimeSet[i] = 3 * DAY; // 3days
     }
 
     //内存分配失败
@@ -342,10 +358,10 @@ int initFuncArcfault(void) {
  *            1,3,5,7,9次奇次谐波数据。有计算过则直接传入，否则设为NULL
  * @param outArcNum
  *            output检测到的电弧数目(不一定是故障电弧，好弧也包含在内),可设置为NULL
- * @return 是否需要故障报警,0不需要,1需要,-1未初始化
+ * @return 是否需要故障报警,0不需要,1需要,2报警待确认中,-1未初始化
  */
-int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, int *outArcNum,
-        int *outThisPeriodNum, char *msg) {
+int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, float *voltage, float effValue,
+        float *oddFft, int *outArcNum, int *outThisPeriodNum, char *msg) {
     if (gTimer == NULL || channel >= CHANNEL_NUM || gIsInitialized == 0) {
         return -1;
     }
@@ -598,14 +614,16 @@ int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, i
     }
     // 给感性电弧1.5倍的额外权重,保障即使9个及以下的感性电弧也不会报警
     int arcNum1S = resArcNum1S + inductArcNum1S * 3 / 2;
+    int arcNumThisPeriod = resArcNum + inductArcNum;
     if (outArcNum != NULL)
         *outArcNum = arcNum1S;
     // 记录当前周期128个点的电弧数
     if (outThisPeriodNum != NULL)
-        *outThisPeriodNum = resArcNum + inductArcNum;
+        *outThisPeriodNum = arcNumThisPeriod;
 
     // 检测到电弧14个->进入待确认状态->在待确认期间发现不符合条件直接进入免疫->切出稳态后再继续进入正常检测期
     int fluctCheckEnd = gMoreInfoIndex[channel], fluctCheckLen = MOREINFO_BUFF_NUM;
+    int alarmAction = ARCFAULT_ACTION_NONE;
     switch (gStatus[channel]) {
     case STATUS_NORMAL:
         // 进入免疫状态：1.占空比过大 2.一个周期检测到双弧超过40% 3.最大连续序列过长
@@ -635,7 +653,8 @@ int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, i
                 pAlarmCounter[channel]++;
                 if (outArcNum != NULL)
                     *outArcNum = gArcNumAlarming[channel]; // 报警时使用确认点时记录的数目
-                return 1;
+                alarmAction = ARCFAULT_ACTION_ALARM;
+                break;
             }
         } else if (dutyRatio >= gDutyRatioThresh || have2Number * 100 / totalLen >= gArc2NumRatioThresh
                 || maxSeries >= gMaxSeriesThresh
@@ -655,6 +674,77 @@ int arcfaultDetect(int channel, float *current, float effValue, float *oddFft, i
         }
         break;
     }
+
+    //智能模式
+    if (gSmartMode[channel] == ARCFAULT_SMARTMODE_ON) {
+
+        if (arcNum1S >= 8 && arcNumThisPeriod > 0) {
+            int zeroCross = getZeroCrossIndex(voltage, 0, 128);
+            ArcCalFeature(channel, current, zeroCross, 128, effValue, arcNum1S, arcNumThisPeriod);
+            if (alarmAction == ARCFAULT_ACTION_ALARM) {
+                int smartmodeAlarmAction = alarmAction;
+                if (gSmartmodeLearningTime[channel] > 0) {
+                    smartmodeAlarmAction = ArcStudyAnalysis(channel, 1);
+                } else {
+                    smartmodeAlarmAction = ArcStudyAnalysis(channel, 0);
+                }
+                alarmAction = smartmodeAlarmAction; //智能模式调整报警动作
+            }
+        }
+
+        //学习模式倒计时
+        if (gSmartmodeLearningTime[channel] > 0) {
+            if (gTimer[channel] % 50 == 49) {
+                gSmartmodeLearningTime[channel]--;
+            }
+        }
+
+        if (unixTime - gLastAuditAlarmTime[channel] >= HOUR) {
+            if (alarmAction == ARCFAULT_ACTION_ALARM) {
+                insertCharToBuff(gSmartmodeTimeTrigger[channel], 24, 1);
+                gLastAuditAlarmTime[channel] = unixTime; //上一次报警记录时间
+            } else {
+                insertCharToBuff(gSmartmodeTimeTrigger[channel], 24, 0);
+            }
+        }
+
+        //24小时内触发4次以上，进入学习模式
+        int smartmodeTimeTrigger = 0;
+        for (int i = 0; i < 24; i++) {
+            smartmodeTimeTrigger += gSmartmodeTimeTrigger[channel][i];
+        }
+
+        //连续超过阈值60*2次，进入学习模式
+        if (gTimer[channel] % 50 == 49) {
+            if (arcNum1S >= 38) {
+                gSmartmodeNumTrigger[channel]++;
+                gSmartmodeNumTriggerMissedCounter[channel] = 0;
+            } else {
+                if (gSmartmodeNumTriggerMissedCounter[channel] < 5)
+                    gSmartmodeNumTriggerMissedCounter[channel]++;
+
+                if (gSmartmodeNumTriggerMissedCounter[channel] >= 2) //连续2s不满足，清0
+                    gSmartmodeNumTrigger[channel] = 0;
+            }
+        }
+        if ((smartmodeTimeTrigger >= 4 || gSmartmodeNumTrigger[channel] >= 10)
+                && gSmartmodeLearningTime[channel] <= 0 && alarmAction == ARCFAULT_ACTION_ALARM) {
+#if LOG_ON == 1
+            printf("start learning %d\r\n", gSmartmodeLearningTimeSet[channel]);
+#endif
+            startArcLearning(channel);
+        }
+
+    }
+
+    return alarmAction;
+}
+
+//智能模式使能. 如演示等非正常环境使用时,建议临时关闭
+int setArcfaultSmartMode(int channel, int mode) {
+    if (mode > 1 || mode < 0)
+        return -1;
+    gSmartMode[channel] = mode;
     return 0;
 }
 
@@ -732,4 +822,16 @@ void setArcCurrentRange(float minCurrent, float maxCurrent) {
 
     gMinCurrent = minCurrent;
     gMaxCurrent = maxCurrent;
+}
+
+void setArcLearningTime(int channel, int learningTime) {
+    gSmartmodeLearningTimeSet[channel] = learningTime;
+}
+
+void startArcLearning(int channel) {
+    gSmartmodeLearningTime[channel] = gSmartmodeLearningTimeSet[channel];
+}
+
+void stopArcLearning(int channel) {
+    gSmartmodeLearningTime[channel] = 0;
 }

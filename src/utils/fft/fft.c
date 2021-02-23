@@ -7,7 +7,7 @@
 #include "zx_fft.h"
 #include "fft.h"
 #define  SAMPLE_NODES              (128)
-COMPLEX x[SAMPLE_NODES];
+static COMPLEX x[SAMPLE_NODES];
 
 static void initData(float *f) {
     int i;

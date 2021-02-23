@@ -21,10 +21,8 @@
 #endif
 
 /**固定定义区*/
-#define LOG_ON 1
-#define DEBUG_ONLY 0
-const static char VERSION[] = { 1, 0, 0, 1 };
-static const int B_MAX[3] = { 2021, 6, 30 }; //最大允许集成编译时间,其他地方是障眼法
+const static char VERSION[] = { 1, 0, 0, 2 };
+static const int B_MAX[3] = { 2021, 12, 30 }; //最大允许集成编译时间,其他地方是障眼法
 
 /**运行变量区*/
 #define WAVE_BUFF_NUM 512
@@ -127,7 +125,7 @@ void setMinEventDeltaPower(int channel, float minEventDeltaPower) {
     gMinEventDeltaPower[channel] = minEventDeltaPower;
 }
 
-int getPowerCost(int channel) {
+float getPowerCost(int channel) {
     return gPowerCost[channel];
 }
 
@@ -135,6 +133,7 @@ int getPowerCost(int channel) {
 // appBuildDate sample "Mar 03 2020" 集成编译库文件的时间
 // libBuildDate 生成库文件的时间
 // expiredDate 认为指定的过期时间
+#define STR_SIZE 11
 static int gAppBuildYear = 2020, gAppBuildMonth = 4, gAppBuildDay = 2;
 static int gLibBuildYear = 2020, gLibBuildMonth = 4, gLibBuildDay = 1;
 static int isExpired(const char *appBuildDate, const char *libBuildDate, const int *expiredDate) {
@@ -169,7 +168,7 @@ static int isExpired(const char *appBuildDate, const char *libBuildDate, const i
         }
     }
 
-    const static int STR_SIZE = sizeof("2020-01-30");
+    //const static int STR_SIZE = sizeof("2020-01-30");
     char appBuildDateString[STR_SIZE];
     memset(appBuildDateString, 0, sizeof(appBuildDateString));
 
@@ -579,8 +578,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     if (gFuncArcfaultEnabled) {
         // float oddFft[5] = { 0 };
         // getOddFft(cur, 0, oddFft);
-        gArcfaultAlarm[channel] = arcfaultDetect(channel, cur, effI, NULL, &gArcNum[channel],
-                &gThisPeriodNum[channel], NULL);
+        gArcfaultAlarm[channel] = arcfaultDetect(channel, unixTimestamp, &ds, cur, vol, effI, NULL,
+                &gArcNum[channel], &gThisPeriodNum[channel], NULL);
         if (gArcfaultAlarm[channel]) {
 #if LOG_ON == 1
             printf("gArcFaultAlarm detected as=%d atp=%d\n", gArcNum[channel], gThisPeriodNum[channel]);

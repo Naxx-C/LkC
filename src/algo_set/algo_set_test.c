@@ -1,6 +1,7 @@
 #include "file_utils.h"
 #include "string_utils.h"
 #include "algo_set_build.h"
+#include "func_arcfault.h"
 #include "time_utils.h"
 #include "algo_set.h"
 #include <stdio.h>
@@ -28,12 +29,15 @@ static char gDirs[][100] = {
 //        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
 //        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
 //        "F:\\Tmp\\charging_medium_lowratelk2",
-        "F:\\Tmp\\labtop"
-        };
+        "F:\\Tmp\\arcfault_falsealarm\\diantaolu" };
 
 static int init() {
 
-    initTpsonAlgoLib();
+    int initRet = initTpsonAlgoLib();
+    if (initRet != 0) {
+        printf("initerr=%d\n", initRet);
+    }
+
     setModuleEnable(ALGO_CHARGING_DETECT, 1);
     setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
     setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
@@ -45,11 +49,11 @@ static int init() {
         setMinEventDeltaPower(channel, 55);
         setMinChargingDevicePower(channel, 55);
     }
-    addMaliciousLoadWhitelist(1, 450);
-    addMaliciousLoadWhitelist(1, 460);
-    addMaliciousLoadWhitelist(1, 500);
-    addMaliciousLoadWhitelist(1, 520);
-    removeFromMaliLoadWhitelist(1, 490);
+    addMaliciousLoadWhitelist(0, 450);
+    addMaliciousLoadWhitelist(0, 460);
+    addMaliciousLoadWhitelist(0, 500);
+    addMaliciousLoadWhitelist(0, 520);
+    removeFromMaliLoadWhitelist(0, 490);
     return 0;
 }
 
@@ -114,9 +118,12 @@ int algo_set_test() {
         printf("\n\n\n=======%s=======\n", dirPath);
 
         init();
+        setArcLearningTime(dirIndex % CHANNEL_NUM, 3);
+        setArcfaultSensitivity(dirIndex % CHANNEL_NUM, ARCFAULT_SENSITIVITY_HIGH);
         DIR *dir = NULL;
         struct dirent *entry;
 
+        int timeGap=0;
         int pointNum = 0, fileIndex = 0;
         if ((dir = opendir(dirPath)) == NULL) {
             printf("opendir failed\n");
@@ -127,7 +134,7 @@ int algo_set_test() {
                         || !endWith(entry->d_name, ".csv")) //016152951
                     continue;
 //                initTpsonAlgoLib();
-                init();
+//                init();
                 int convertHardcode = 1;
                 if (startWith(entry->d_name, "elec_"))
                     convertHardcode = 1; //TODO:2020.11月之前的，单相电抓的数据是反的,需要-1
@@ -150,9 +157,10 @@ int algo_set_test() {
                     fileIndex++;
                     i++;
                     if (i >= 128) {
-//                        feedData(dirIndex % CHANNEL_NUM, current, voltage, time(NULL), NULL);
                         setMaxChargingDevicePower(0, 5000);
-                        feedData(dirIndex % CHANNEL_NUM, gSimulatedData, voltage, time(NULL), NULL);
+                        feedData(dirIndex % CHANNEL_NUM, current, voltage, time(NULL) + (timeGap) * 360,
+                        NULL);
+//                        feedData(dirIndex % CHANNEL_NUM, gSimulatedData, voltage, time(NULL), NULL);
                         i = 0;
                     }
                     pointNum++;

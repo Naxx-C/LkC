@@ -26,7 +26,7 @@ extern void scale(TYPE_SCALE x[],
            int32_t n, 
            TYPE_SCALE s_low, 
            TYPE_SCALE s_high);
-extern float cabs(COMPLEX x);
+extern float fft_cabs(COMPLEX x);
 extern int ones_32(uint32_t n);  
 extern uint32_t floor_log2_32(uint32_t x);
 

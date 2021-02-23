@@ -95,9 +95,12 @@ int main() {
     setArcAlarmThresh(14);
     setArcFftEnabled(0);
     arcAlgoInit(CHANNEL);
+    setArcfaultAlarmMode(ARCFAULT_SENSITIVITY_LOW);
+//    setArcResJumpRatio(3);
     // ArcFaultAlgo.setArcResJumpThresh(0.9f);
     // ArcFaultAlgo.setArcCheckDisabled(ArcFaultAlgo.ARC_CON_POSJ);
 //    setArcCheckDisabled(ARC_CON_PREJ); // Cleaner_Resistor must be
+//    setArcCheckDisabled(ARC_CON_BJ);
 //    setArcCheckDisabled(ARC_CON_POSJ);
 //    setArcOverlayCheckEnabled(1);
 
@@ -158,8 +161,8 @@ int main() {
                     memset(outArcNum, 0, sizeof(int) * CHANNEL);
                     for (int channel = 0; channel < CHANNEL; channel++) {
 
-//                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
-                        char alarm = arcAnalyze(channel, gTestArcBuff, 128, &(arcNum1s[channel]),
+                        char alarm = arcAnalyze(channel, currents, 128, &(arcNum1s[channel]),
+//                        char alarm = arcAnalyze(channel, gTestArcBuff, 128, &(arcNum1s[channel]),
                                 &(outArcNum[channel]));
 
                         alarmNum[channel] += alarm;
