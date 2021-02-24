@@ -20,6 +20,7 @@
 #include "string.h"
 #include "stdbool.h"
 #include "algo_set_build.h"
+#include "log_utils.h"
 
 //支持最大通道数
 #define MAX_CHANNEL_NUM CHANNEL_NUM
@@ -301,7 +302,12 @@ int ArcStudyAnalysis(int channel, int mode) {
         for (int i = 0; i < MAX_FEATURE_CACHE_NUM; i++) {
             if (Possible[i] >= 3) {
 #if LOG_ON == 1
-                printf("study new feature\r\n");
+                printf("add new feature\r\n");
+#endif
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("add new feature\r\n");
+                }
 #endif
                 AddArcFeature(channel, &ArcCacheData[channel][i]);
                 break;

@@ -3,6 +3,7 @@
 #include "string_utils.h"
 #include "time_utils.h"
 #include "power_utils.h"
+#include "log_utils.h"
 #include "algo_set.h"
 #include "algo_set_build.h"
 #include "algo_base_struct.h"
@@ -633,7 +634,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     }
 
     if (DEBUG_ONLY) {
-        if (gTimer[channel]  >= 50 * 86400 * 2) {
+        if (gTimer[channel] >= 50 * 86400 * 2) {
             gChargingAlarm[channel] = 0;
             gDormConverterAlarm[channel] = 0;
             gMaliLoadAlarm[channel] = 0;
@@ -701,6 +702,11 @@ int initTpsonAlgoLib(void) {
     initFuncChargingAlarm();
     if (gIsLibExpired)
         return -2;
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("init ok\r\n");
+    }
+#endif
     return 0;
 }
 

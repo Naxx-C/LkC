@@ -17,6 +17,8 @@
 int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extraMsg);
 //算法模块初始化
 int initTpsonAlgoLib(void);
+//注册调试打印函数,如传入printf
+void registerPrintf(int print(const char*, ...));
 
 #define ALGO_CHARGING_DETECT 0
 #define ALGO_DORM_CONVERTER_DETECT 1

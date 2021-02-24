@@ -1,19 +1,11 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
-#include "dirent.h"
+#include <nilm_appliance.h>
+#include <nilm_idmap.h>
+#include <nilm_onlinelist.h>
+#include <stdio.h>
 #include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include "nilm_appliance.h"
-#include "nilm_algo.h"
-#include "nilm_idmap.h"
-#include "nilm_onlinelist.h"
-#include "time_utils.h"
-#include <sys/time.h>
+#include "log_utils.h"
 
-extern int arcfault_main();
-extern int nilm_algo_main();
 typedef struct {
     int a;
 } TestA;
@@ -100,7 +92,20 @@ void getX(int **y) {
 const char *APP_BUILD_DATE = __DATE__;
 extern void setArcCurrentRange(float minCurrent, float maxCurrent);
 
+struct printf_operations {
+    int (*arc_printf)(const char*, ...);
+};
+struct printf_operations arc_ops = { .arc_printf = printf,
+
+};
+
+
 int main() {
+
+    registerPrintf(printf);
+
+//    if (algoset_printf != NULL)
+//        algoset_printf("hello %d\n", 1);
 //    setArcCurrentRange(1.0f, 4.0f);
 
     algo_set_test();

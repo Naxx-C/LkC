@@ -15,5 +15,7 @@
 
 #define LOG_ON 0
 #define DEBUG_ONLY 0
+//对外输出的打印
+#define OUTLOG_ON 1
 
 #endif /* ALGO_SET_ALGO_SET_H_ */

@@ -5,6 +5,7 @@
 #include "data_structure_utils.h"
 #include "arcfault_smartmode.h"
 #include "time_utils.h"
+#include "log_utils.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -681,15 +682,16 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
         if (arcNum1S >= 8 && arcNumThisPeriod > 0) {
             int zeroCross = getZeroCrossIndex(voltage, 0, 128);
             ArcCalFeature(channel, current, zeroCross, 128, effValue, arcNum1S, arcNumThisPeriod);
-            if (alarmAction == ARCFAULT_ACTION_ALARM) {
-                int smartmodeAlarmAction = alarmAction;
-                if (gSmartmodeLearningTime[channel] > 0) {
-                    smartmodeAlarmAction = ArcStudyAnalysis(channel, 1);
-                } else {
-                    smartmodeAlarmAction = ArcStudyAnalysis(channel, 0);
-                }
-                alarmAction = smartmodeAlarmAction; //智能模式调整报警动作
+        }
+
+        if (alarmAction == ARCFAULT_ACTION_ALARM) {
+            int smartmodeAlarmAction = alarmAction;
+            if (gSmartmodeLearningTime[channel] > 0) {
+                smartmodeAlarmAction = ArcStudyAnalysis(channel, 1);
+            } else {
+                smartmodeAlarmAction = ArcStudyAnalysis(channel, 0);
             }
+            alarmAction = smartmodeAlarmAction; //智能模式调整报警动作
         }
 
         //学习模式倒计时
@@ -708,13 +710,13 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
             }
         }
 
-        //24小时内触发4次以上，进入学习模式
+        //24小时内触发4次以上
         int smartmodeTimeTrigger = 0;
         for (int i = 0; i < 24; i++) {
             smartmodeTimeTrigger += gSmartmodeTimeTrigger[channel][i];
         }
 
-        //连续超过阈值60*2次，进入学习模式
+        //连续超过阈值60*2次
         if (gTimer[channel] % 50 == 49) {
             if (arcNum1S >= 38) {
                 gSmartmodeNumTrigger[channel]++;
@@ -727,8 +729,9 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                     gSmartmodeNumTrigger[channel] = 0;
             }
         }
-        if ((smartmodeTimeTrigger >= 4 || gSmartmodeNumTrigger[channel] >= 10)
-                && gSmartmodeLearningTime[channel] <= 0 && alarmAction == ARCFAULT_ACTION_ALARM) {
+        // 不在学习模式并且1个小时内报过警,进入学习模式
+        if ((smartmodeTimeTrigger >= 4 || gSmartmodeNumTrigger[channel] >= 120)
+                && gSmartmodeLearningTime[channel] <= 0 && (unixTime - gLastAuditAlarmTime[channel] < HOUR)) {
 #if LOG_ON == 1
             printf("start learning %d\r\n", gSmartmodeLearningTimeSet[channel]);
 #endif
@@ -833,6 +836,11 @@ int getArcLearningRemainingTime(int channel) {
 }
 
 void startArcLearning(int channel) {
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("start arclearing\r\n");
+    }
+#endif
     gSmartmodeLearningTime[channel] = gSmartmodeLearningTimeSet[channel];
 }
 
