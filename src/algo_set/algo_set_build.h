@@ -18,4 +18,4 @@
 //对外输出的打印
 #define OUTLOG_ON 1
 
-#endif /* ALGO_SET_ALGO_SET_H_ */
+#endif /* ALGO_SET_BUILD_H_ */

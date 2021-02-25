@@ -108,6 +108,12 @@ void clearArcLearningResult(void);
 //获取学习模式剩余学习时间,单位s
 int getArcLearningRemainingTime(int channel);
 //其他非常用配置
+/**
+ * 智能学习模式次数触发学习模式的配置
+ * numPerSecond: 默认38.每秒至少多少次
+ * duration: 默认60.连续大于numPerSecond的持续时间，单位s
+ */
+void setArcSmartmodeNumTriggerThresh(int numPerSecond, int duration);
 void setArcMinWidth(int minWidth);
 void setArcCurrentRange(float minCurrent, float maxCurrent);//默认[1.5A-100A]
 

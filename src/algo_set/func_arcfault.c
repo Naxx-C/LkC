@@ -40,6 +40,8 @@ static int gSensitivity[CHANNEL_NUM];
 static int gSmartmodeLearningTime[CHANNEL_NUM] = { 0 };
 static int gSmartmodeLearningTimeSet[CHANNEL_NUM] = { 0 };
 static int gSmartMode[CHANNEL_NUM];
+static int gSmartmodeNumTriggerPerSecond = 38; //每秒检测出的电弧数目
+static int gSmartmodeNumTriggerDuration = 60; //持续时间
 
 /**
  * 自用区
@@ -718,7 +720,7 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
 
         //连续超过阈值60*2次
         if (gTimer[channel] % 50 == 49) {
-            if (arcNum1S >= 38) {
+            if (arcNum1S >= gSmartmodeNumTriggerPerSecond) {
                 gSmartmodeNumTrigger[channel]++;
                 gSmartmodeNumTriggerMissedCounter[channel] = 0;
             } else {
@@ -730,7 +732,7 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
             }
         }
         // 不在学习模式并且1个小时内报过警,进入学习模式
-        if ((smartmodeTimeTrigger >= 4 || gSmartmodeNumTrigger[channel] >= 120)
+        if ((smartmodeTimeTrigger >= 4 || gSmartmodeNumTrigger[channel] >= gSmartmodeNumTriggerDuration)
                 && gSmartmodeLearningTime[channel] <= 0 && (unixTime - gLastAuditAlarmTime[channel] < HOUR)) {
 #if LOG_ON == 1
             printf("start learning %d\r\n", gSmartmodeLearningTimeSet[channel]);
@@ -825,6 +827,11 @@ void setArcCurrentRange(float minCurrent, float maxCurrent) {
 
     gMinCurrent = minCurrent;
     gMaxCurrent = maxCurrent;
+}
+
+void setArcSmartmodeNumTriggerThresh(int numPerSecond, int duration) {
+    gSmartmodeNumTriggerPerSecond = numPerSecond;
+    gSmartmodeNumTriggerDuration = duration;
 }
 
 void setArcLearningTime(int channel, int learningTime) {

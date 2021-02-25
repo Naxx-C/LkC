@@ -51,7 +51,7 @@ int ArcfaultFlashOpsRegister(struct flash_operations *ops) {
     uint32_t flag_start = 0;
     uint32_t flag_end = 0;
 
-    if (ops == NULL || ops->save_addr == NULL || ops->flash_buff_write == NULL || ops->flash_buff_read == NULL) {
+    if (ops == NULL || ops->save_addr == 0 || ops->flash_buff_write == NULL || ops->flash_buff_read == NULL) {
         return -1;
     }
 
