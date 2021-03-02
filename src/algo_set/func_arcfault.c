@@ -72,13 +72,18 @@ static float mLastPeriodPiont[CHANNEL_NUM] = { 0 };
 static char gIsFirst[CHANNEL_NUM] = { 0 };
 
 static int gIsInitialized = 0;
+static int gArcLastAlarmTime[CHANNEL_NUM] = { 0 };
+#define ARC_TIME_TRIGGER_BUFFSIZE 24
+static char gSmartmodeTimeTrigger[CHANNEL_NUM][ARC_TIME_TRIGGER_BUFFSIZE] = { 0 }; //24h内有4次触发(1个小时内重复触发不计)
+static int gTimeTriggerBuffIndex[CHANNEL_NUM] = { 0 };
+static int gLastTimeTriggerSectionTime[CHANNEL_NUM] = { 0 };
+static int gLastTimeTriggerAlarmAuditTime[CHANNEL_NUM] = { 0 };
+static int gSmartmodeNumTrigger[CHANNEL_NUM] = { 0 }; //连续1分钟内有每秒38次触发
+static char gNumTriggerMissedCounter[CHANNEL_NUM] = { 0 }; //干扰中断计数器
 
-static int gLastAuditAlarmTime[CHANNEL_NUM] = { 0 };
-static char gSmartmodeTimeTrigger[CHANNEL_NUM][24] = { 0 }; //24h内有4次触发(1个小时内重复触发不计)
-static int gSmartmodeNumTrigger[CHANNEL_NUM] = { 0 }; //连续2分钟内有38*60*2次触发
-static char gSmartmodeNumTriggerMissedCounter[CHANNEL_NUM] = { 0 }; //连续2分钟内有38*60*2次触发
-static int HOUR = 3600;
-static int DAY = 3600 * 24;
+const static int MIN = 60;
+const static int HOUR = 3600;
+const static int DAY = 3600 * 24;
 
 static const int MODE_MAX = 2;
 void setArcfaultSensitivity(int channel, int sensitivity) {
@@ -137,6 +142,68 @@ void setArcfaultSensitivity(int channel, int sensitivity) {
     default:
         break;
     }
+}
+
+static int getSmartModeTimeTriggerTimes(int channel, int alarmAction, int unixTime) {
+    if (unixTime - gLastTimeTriggerSectionTime[channel] >= HOUR) {
+        if (gTimeTriggerBuffIndex[channel] >= ARC_TIME_TRIGGER_BUFFSIZE
+                || gTimeTriggerBuffIndex[channel] < 0) {
+            gTimeTriggerBuffIndex[channel] = 0;
+        }
+        if (alarmAction == 1) {
+            if (unixTime - gLastTimeTriggerAlarmAuditTime[channel] >= HOUR) {
+                gSmartmodeTimeTrigger[channel][gTimeTriggerBuffIndex[channel]] = 1;
+                gLastTimeTriggerAlarmAuditTime[channel] = unixTime;
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("TimeTrigger1 time=%d\r\n", gLastTimeTriggerAlarmAuditTime[channel]);
+                }
+#endif
+#endif
+            }
+        } else {
+            gSmartmodeTimeTrigger[channel][gTimeTriggerBuffIndex[channel]] = 0;
+        }
+
+        gTimeTriggerBuffIndex[channel]++;
+        gLastTimeTriggerSectionTime[channel] = unixTime; //上一次处理记录时间
+    } else if (alarmAction == 1) {
+        int lastIndex = gTimeTriggerBuffIndex[channel] - 1;
+        if (lastIndex < 0) {
+            lastIndex = ARC_TIME_TRIGGER_BUFFSIZE - 1;
+        }
+        if (gSmartmodeTimeTrigger[channel][lastIndex] == 0
+                && unixTime - gLastTimeTriggerAlarmAuditTime[channel] >= HOUR) {
+            gSmartmodeTimeTrigger[channel][lastIndex] = 1;
+            gLastTimeTriggerAlarmAuditTime[channel] = unixTime;
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+            if (outprintf != NULL) {
+                outprintf("TimeTrigger2 time=%d\r\n", gLastTimeTriggerAlarmAuditTime[channel]);
+            }
+#endif
+#endif
+        }
+    }
+
+    int smartmodeTimeTrigger = 0;
+    for (int i = 0; i < ARC_TIME_TRIGGER_BUFFSIZE; i++) {
+        smartmodeTimeTrigger += gSmartmodeTimeTrigger[channel][i];
+    }
+
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+    static int lastSmartmodeTimeTrigger[CHANNEL_NUM] = { 0, 0, 0, 0 };
+    if (outprintf != NULL) {
+        if (smartmodeTimeTrigger >= 1 && smartmodeTimeTrigger != lastSmartmodeTimeTrigger[channel])
+            outprintf("smartmodeTimeTrigger[%d]=%d last=%d\r\n", channel, smartmodeTimeTrigger,
+                    lastSmartmodeTimeTrigger[channel]);
+    }
+    lastSmartmodeTimeTrigger[channel] = smartmodeTimeTrigger;
+#endif
+#endif
+    return smartmodeTimeTrigger;
 }
 
 static int getHealth(float *delta, float *absDelta, int len, float thresh) {
@@ -333,6 +400,7 @@ int initFuncArcfault(void) {
     else
         gIsInitialized = 1;
 
+    memset(gSmartmodeTimeTrigger, 0, sizeof(gSmartmodeTimeTrigger));
     for (int i = 0; i < CHANNEL_NUM; i++) {
         gStatus[i] = STATUS_NORMAL;
         gIsFirst[i] = 1;
@@ -341,6 +409,10 @@ int initFuncArcfault(void) {
         gSmartMode[i] = ARCFAULT_SMARTMODE_ON;
         gSmartmodeLearningTime[i] = 0;
         gSmartmodeLearningTimeSet[i] = 3 * DAY; // 3days
+        gTimeTriggerBuffIndex[i] = 0;
+        gLastTimeTriggerSectionTime[i] = 0;
+        gLastTimeTriggerAlarmAuditTime[i] = 0;
+        gArcLastAlarmTime[i] = 0;
     }
 
     //内存分配失败
@@ -637,13 +709,27 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                     || (gFftEnabled && getLastestFluctuation(gHarmonicBuff[channel],
                     MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
                 gStatus[channel] = STATUS_IMMUNE;
+#if TMP_DEBUG
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("immune1 dr=%d h2n=%d ms=%d\r\n", dutyRatio, have2Number, maxSeries);
+                }
+#endif
+#endif
                 break;
             }
             // 全是阻性负载电弧的话，要求基本稳定
-            if (inductArcNum1S == 0 && getLastestFluctuation(gEffBuff[channel],
-            MOREINFO_BUFF_NUM, fluctCheckEnd, MOREINFO_BUFF_NUM, 0.2f) >= 45) {
-                break;
-            }
+//            if (inductArcNum1S == 0 && getLastestFluctuation(gEffBuff[channel],
+//            MOREINFO_BUFF_NUM, fluctCheckEnd, MOREINFO_BUFF_NUM, 0.2f) >= 45) {
+//#if TMP_DEBUG
+//#if OUTLOG_ON
+//                if (outprintf != NULL) {
+//                    outprintf("resarc but not s\r\n");
+//                }
+//#endif
+//#endif
+//                break;
+//            }
             gWatingTime[channel] = gTimer[channel];
             gStatus[channel] = STATUS_WAITING_CHECK;
             gArcNumAlarming[channel] = arcNum1S; // 记录当前电弧数目，留做报警时传递
@@ -665,6 +751,13 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                         && getLastestFluctuation(gHarmonicBuff[channel],
                         MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
             gStatus[channel] = STATUS_IMMUNE;
+#if TMP_DEBUG
+#if OUTLOG_ON
+            if (outprintf != NULL) {
+                outprintf("immune2 dr=%d h2n=%d ms=%d\r\n", dutyRatio, have2Number, maxSeries);
+            }
+#endif
+#endif
             break;
         }
         break;
@@ -703,45 +796,52 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
             }
         }
 
-        if (unixTime - gLastAuditAlarmTime[channel] >= HOUR) {
-            if (alarmAction == ARCFAULT_ACTION_ALARM) {
-                insertCharToBuff(gSmartmodeTimeTrigger[channel], 24, 1);
-                gLastAuditAlarmTime[channel] = unixTime; //上一次报警记录时间
-            } else {
-                insertCharToBuff(gSmartmodeTimeTrigger[channel], 24, 0);
-            }
-        }
-
         //24小时内触发4次以上
-        int smartmodeTimeTrigger = 0;
-        for (int i = 0; i < 24; i++) {
-            smartmodeTimeTrigger += gSmartmodeTimeTrigger[channel][i];
-        }
+        int smartmodeTimeTrigger = getSmartModeTimeTriggerTimes(channel, alarmAction, unixTime);
 
-        //连续超过阈值60*2次
+        //连续超过阈值60*1次
         if (gTimer[channel] % 50 == 49) {
             if (arcNum1S >= gSmartmodeNumTriggerPerSecond) {
                 gSmartmodeNumTrigger[channel]++;
-                gSmartmodeNumTriggerMissedCounter[channel] = 0;
+                gNumTriggerMissedCounter[channel] = 0;
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("numtrigger counter=%d\r\n", gSmartmodeNumTrigger[channel]);
+                }
+#endif
             } else {
-                if (gSmartmodeNumTriggerMissedCounter[channel] < 5)
-                    gSmartmodeNumTriggerMissedCounter[channel]++;
+                if (gNumTriggerMissedCounter[channel] < 5)
+                    gNumTriggerMissedCounter[channel]++;
 
-                if (gSmartmodeNumTriggerMissedCounter[channel] >= 2) //连续2s不满足，清0
+                if (gNumTriggerMissedCounter[channel] >= 2) //连续2s不满足，清0
                     gSmartmodeNumTrigger[channel] = 0;
             }
         }
-        // 不在学习模式并且1个小时内报过警,进入学习模式
-        if ((smartmodeTimeTrigger >= 4 || gSmartmodeNumTrigger[channel] >= gSmartmodeNumTriggerDuration)
-                && gSmartmodeLearningTime[channel] <= 0 && (unixTime - gLastAuditAlarmTime[channel] < HOUR)) {
-#if LOG_ON == 1
-            printf("start learning %d\r\n", gSmartmodeLearningTimeSet[channel]);
-#endif
+        // 24小时内有4小时触发过报警,进入学习模式
+        if (smartmodeTimeTrigger >= 4&& gSmartmodeLearningTime[channel] <= 0
+        && alarmAction == ARCFAULT_ACTION_ALARM) {
             startArcLearning(channel);
         }
-
+        // 连续1分钟电弧数超过阈值,进入学习模式
+        if (gSmartmodeNumTrigger[channel] >= gSmartmodeNumTriggerDuration
+                && gSmartmodeLearningTime[channel] <= 0) {
+            startArcLearningWithTime(channel, 3 * MIN);
+        }
     }
 
+    if (alarmAction == ARCFAULT_ACTION_ALARM) {
+#if TMP_DEBUG
+#if OUTLOG_ON
+        if (unixTime - gArcLastAlarmTime[channel] > 0) {
+            if (outprintf != NULL) {
+                outprintf("alarmAction=%d\r\n", alarmAction);
+            }
+        }
+#endif
+#endif
+        gArcLastAlarmTime[channel] = unixTime; //上一次报警时间
+
+    }
     return alarmAction;
 }
 
@@ -845,10 +945,19 @@ int getArcLearningRemainingTime(int channel) {
 void startArcLearning(int channel) {
 #if OUTLOG_ON
     if (outprintf != NULL) {
-        outprintf("start arclearing\r\n");
+        outprintf("start arclearning %d\r\n", gSmartmodeLearningTimeSet[channel]);
     }
 #endif
     gSmartmodeLearningTime[channel] = gSmartmodeLearningTimeSet[channel];
+}
+
+static void startArcLearningWithTime(int channel, int time) {
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("start arclearning %d\r\n", time);
+    }
+#endif
+    gSmartmodeLearningTime[channel] = time;
 }
 
 void stopArcLearning(int channel) {

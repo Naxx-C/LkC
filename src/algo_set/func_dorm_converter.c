@@ -125,6 +125,11 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
         if (errMsg != NULL) {
             sprintf(errMsg, "dap=%.2f drp=%.2f", deltaActivePower, deltaReactivePower);
         }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+        outprintf("dap=%.2f drp=%.2f", deltaActivePower, deltaReactivePower);
+#endif
+#endif
         return 0;
     }
 
@@ -133,6 +138,11 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
         if (errMsg != NULL) {
             sprintf(errMsg, "fn=%d en=%d", wf->flatNum, wf->extremeNum);
         }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+        outprintf("fn=%d en=%d", wf->flatNum, wf->extremeNum);
+#endif
+#endif
         return 0;
     }
 
@@ -141,6 +151,11 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
         if (errMsg != NULL) {
             sprintf(errMsg, "mad=%.2f mav=%.2f", wf->maxDelta, wf->maxValue);
         }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+        outprintf("mad=%.2f mav=%.2f", wf->maxDelta, wf->maxValue);
+#endif
+#endif
         return 0;
     }
     if (errMsg != NULL) {

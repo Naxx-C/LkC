@@ -43,6 +43,7 @@ void setArcfaultSensitivity(int channel, int sensitivity);
 //设置场景适应性学习时长，默认3天
 void setArcLearningTime(int channel, int learningTime);
 void startArcLearning(int channel);
+static void startArcLearningWithTime(int channel, int time);
 void stopArcLearning(int channel);
 void clearArcLearningResult(void);
 

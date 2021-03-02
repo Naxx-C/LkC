@@ -418,7 +418,14 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 
     //step: 事件监测
     int isStable = isPowerStable(gActivePBuff[channel], EFF_BUFF_NUM, 15, 2); //稳态判断
-    //负荷投切事件
+//#if TUOQIANG_DEBUG
+//#if OUTLOG_ON
+//    if (outprintf != NULL && isStable == 0 && gTimer[channel] % 50 == 0) {
+//        outprintf("power\t%.1f \tI\t%.1f \tU\t%.1f\r\n", activePower, effI, effU);
+//    }
+//#endif
+//#endif
+            //负荷投切事件
     int switchEventHappen = 0;
     if (isStable > gLastStable[channel]) {
         //投切事件发生
@@ -435,6 +442,12 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
                 getReactivePower(activePower, effI * effU), switchEventHappen);
         if (strlen(msg) > 0 && extraMsg != NULL)
             strcpy(extraMsg, msg);
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("t=%d stable=%d ap=%.1f rp=%.1f s=%d\r\n", gTimer[channel], isStable, activePower,
+                    getReactivePower(activePower, effI * effU), switchEventHappen);
+        }
+#endif
 #if LOG_ON == 1
         printf("channel=%d timer=%d stable=%d ap=%.2f rp=%.2f\n", channel, gTimer[channel], isStable,
                 activePower, getReactivePower(activePower, effI * effU));
@@ -456,7 +469,41 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
             }
         }
     }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+    static int lastApRiseCounter = 0;
+    if (apRiseCounter >= 2 && apRiseCounter != lastApRiseCounter) {
+        outprintf("gt=%d ut=%d aprc=%d rprc=%d ap=%.1f rp=%.1f\r\n", gTimer[channel], unixTimestamp % 1000,
+                apRiseCounter, rpRiseCounter, activePower, reactivePower);
+    }
+    lastApRiseCounter = apRiseCounter;
+#endif
+#endif
 
+//#if TUOQIANG_DEBUG
+//#if OUTLOG_ON
+//    if (outprintf != NULL && activePower > 1200 && switchEventHappen) {
+//        outprintf("====start print===\r\n");
+//        outprintf("====LU===\r\n");
+//        for (int i = 0; i < 128; i++) {
+//            outprintf("%.1f\t", gLastStableUWaveBuff[channel][i]);
+//        }
+//        outprintf("====U2===\r\n");
+//        for (int i = 0; i < 128; i++) {
+//            outprintf("%.1f\t\n", gUWaveBuff[channel][i]);
+//        }
+//        outprintf("====LI===\r\n");
+//        for (int i = 0; i < 256; i++) {
+//            outprintf("%.1f\t", gLastStableIWaveBuff[channel][i]);
+//        }
+//        outprintf("====I===\r\n");
+//        for (int i = 0; i < 128; i++) {
+//            outprintf("%.1f\t", gIWaveBuff[channel][i]);
+//        }
+//        outprintf("====end print===\r\n");
+//    }
+//#endif
+//#endif
     //step:特征提取
     float deltaEffI = LF, deltaEffU = LF, iPulse = LF, deltaActivePower = LF, deltaReactivePower = LF;
     float deltaOddFft[5] = { LF, LF, LF, LF, LF }; //奇次谐波
@@ -526,6 +573,11 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 #if LOG_ON == 1
                 printf("gDormConverterAlarm adjusting detected\n");
 #endif
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("DormConverter detected\r\n");
+                }
+#endif
                 gDormConverterLastAlarmTime[channel] = unixTimestamp;
             }
         }
@@ -538,6 +590,11 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 #if LOG_ON == 1
                 printf("gDormConverterAlarm detected flat=%d extre=%d md=%.2f mv=%.2f\n", deltaWf.flatNum,
                         deltaWf.extremeNum, deltaWf.maxDelta, deltaWf.maxValue);
+#endif
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("DormConverter detected\r\n");
+                }
 #endif
                 gDormConverterLastAlarmTime[channel] = unixTimestamp;
             }
@@ -563,6 +620,14 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         char msg[50] = { 0 };
         gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, deltaActivePower,
                 deltaReactivePower, effU, activePower, reactivePower, &deltaWf, &ds, msg);
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("\t%.2f\t%.2f\t%.2f da\t%.2f\t%.2f\r\n", deltaOddFft[0], deltaOddFft[1], deltaOddFft[2],
+                    deltaActivePower, deltaReactivePower);
+        }
+#endif
+#endif
 //        if (strlen(msg) > 0)
 //            strcpy(extraMsg,msg);
 #if LOG_ON == 1
@@ -571,6 +636,12 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         if (gMaliLoadAlarm[channel]) {
             printf("gMaliLoadAlarm detected da=%.2f dr=%.2f eu=%.2f\n", deltaActivePower, deltaReactivePower,
                     effU);
+        }
+#endif
+#if OUTLOG_ON
+        if (outprintf != NULL && gMaliLoadAlarm[channel]) {
+            outprintf("gMaliLoadAlarm detected da=%.2f dr=%.2f eu=%.2f\r\n", deltaActivePower,
+                    deltaReactivePower, effU);
         }
 #endif
     }
@@ -704,7 +775,7 @@ int initTpsonAlgoLib(void) {
         return -2;
 #if OUTLOG_ON
     if (outprintf != NULL) {
-        outprintf("init ok\r\n");
+        outprintf("init ok ^_^\r\n");
     }
 #endif
     return 0;

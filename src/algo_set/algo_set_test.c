@@ -29,7 +29,8 @@ static char gDirs[][100] = {
 //        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
 //        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
 //        "F:\\Tmp\\charging_medium_lowratelk2",
-        "F:\\Tmp\\arcfault_falsealarm\\diantaolu" };
+//        "F:\\Tmp\\arcfault_falsealarm\\diantaolu",
+        "F:\\data\\ArcfaultData\\category\\RealAlarm\\hairdryer" };
 
 static int init() {
 
@@ -38,9 +39,9 @@ static int init() {
         printf("initerr=%d\n", initRet);
     }
 
-    setModuleEnable(ALGO_CHARGING_DETECT, 1);
-    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
-    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
+//    setModuleEnable(ALGO_CHARGING_DETECT, 1);
+//    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+//    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
     setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {
@@ -118,12 +119,11 @@ int algo_set_test() {
         printf("\n\n\n=======%s=======\n", dirPath);
 
         init();
-        setArcLearningTime(dirIndex % CHANNEL_NUM, 3);
-        setArcfaultSensitivity(dirIndex % CHANNEL_NUM, ARCFAULT_SENSITIVITY_HIGH);
+//        setArcLearningTime(dirIndex % CHANNEL_NUM, 3);
         DIR *dir = NULL;
         struct dirent *entry;
 
-        int timeGap=0;
+        int timeGap = 0;
         int pointNum = 0, fileIndex = 0;
         if ((dir = opendir(dirPath)) == NULL) {
             printf("opendir failed\n");
@@ -158,7 +158,7 @@ int algo_set_test() {
                     i++;
                     if (i >= 128) {
                         setMaxChargingDevicePower(0, 5000);
-                        feedData(dirIndex % CHANNEL_NUM, current, voltage, time(NULL) + (timeGap) * 360,
+                        feedData(dirIndex % CHANNEL_NUM, current, voltage, time(NULL) + (timeGap++) * 360,
                         NULL);
 //                        feedData(dirIndex % CHANNEL_NUM, gSimulatedData, voltage, time(NULL), NULL);
                         i = 0;

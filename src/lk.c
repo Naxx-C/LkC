@@ -99,16 +99,90 @@ struct printf_operations arc_ops = { .arc_printf = printf,
 
 };
 
+#define CHANNEL_NUM 4
+#define HOUR 10
+#define ARC_TIME_TRIGGER_BUFFSIZE 10
+static char gSmartmodeTimeTrigger[CHANNEL_NUM][ARC_TIME_TRIGGER_BUFFSIZE] = { 0 }; //24h内有4次触发(1个小时内重复触发不计)
+static int gTimeTriggerBuffIndex[CHANNEL_NUM] = { 0 };
+static int gLastTimeTriggerSectionTime[CHANNEL_NUM] = { 0 };
+static int gLastTimeTriggerAlarmAuditTime[CHANNEL_NUM] = { 0 };
 
+static int getSmartModeTimeTriggerTimes(int channel, int alarmAction, int unixTime) {
+    if (unixTime - gLastTimeTriggerSectionTime[channel] >= HOUR) {
+        if (gTimeTriggerBuffIndex[channel] >= ARC_TIME_TRIGGER_BUFFSIZE
+                || gTimeTriggerBuffIndex[channel] < 0) {
+            gTimeTriggerBuffIndex[channel] = 0;
+        }
+        if (alarmAction == 1) {
+            if (unixTime - gLastTimeTriggerAlarmAuditTime[channel] >= HOUR) {
+                gSmartmodeTimeTrigger[channel][gTimeTriggerBuffIndex[channel]] = 1;
+                gLastTimeTriggerAlarmAuditTime[channel] = unixTime;
+            }
+        } else {
+            gSmartmodeTimeTrigger[channel][gTimeTriggerBuffIndex[channel]] = 0;
+        }
+
+        gTimeTriggerBuffIndex[channel]++;
+        gLastTimeTriggerSectionTime[channel] = unixTime; //上一次处理记录时间
+    } else if (alarmAction == 1) {
+        int lastIndex = gTimeTriggerBuffIndex[channel] - 1;
+        if (lastIndex < 0) {
+            lastIndex = ARC_TIME_TRIGGER_BUFFSIZE - 1;
+        }
+        if (gSmartmodeTimeTrigger[channel][lastIndex]
+                == 0&& unixTime-gLastTimeTriggerAlarmAuditTime[channel]>=HOUR) {
+            gSmartmodeTimeTrigger[channel][lastIndex] = 1;
+            gLastTimeTriggerAlarmAuditTime[channel] = unixTime;
+        }
+    }
+
+    int smartmodeTimeTrigger = 0;
+    for (int i = 0; i < ARC_TIME_TRIGGER_BUFFSIZE; i++) {
+        smartmodeTimeTrigger += gSmartmodeTimeTrigger[channel][i];
+    }
+
+    return smartmodeTimeTrigger;
+}
+
+static void f2(int a){
+    static int b=0;
+    b += a;
+    printf("%d\n",b);
+}
+
+#define SIZE 100
 int main() {
 
+//    int alarmAction[SIZE] = {//
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 1, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 1, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 1, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 1, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+//            };
+//    for (int i = 0; i < SIZE; i++) {
+//        int smartmodeTimeTrigger = getSmartModeTimeTriggerTimes(0, alarmAction[i % SIZE], 100 + i);
+//        printf("%d: %d\n", i + 1, smartmodeTimeTrigger);
+//    }
+
+    for (int i = 0; i < 3; i++)
+        f2(1);
+    //24小时内触发4次以上
     registerPrintf(printf);
 
 //    if (algoset_printf != NULL)
 //        algoset_printf("hello %d\n", 1);
 //    setArcCurrentRange(1.0f, 4.0f);
-
-    algo_set_test();
+//    algo_set_test();
     return 0;
 
 //    charging_alarm_main();
@@ -178,7 +252,7 @@ int main() {
             printf("%d ", i);
         }
     }
-    // 极值点个数.极值点非平肩,平肩不切换方向
+// 极值点个数.极值点非平肩,平肩不切换方向
     for (int i = 0; i < 32; i++) {
         if (c[i + 1] - c[i] > 0 && (flatBitmap & ((0x1 << (i + 1)) | (0x1 << i))) == 0) {
             if (direction < 0) {
@@ -203,7 +277,7 @@ int main() {
 //    gettimeofday(&tv_end, NULL);
 //    printf("%ld\n",tv_end.tv_usec);
 //    printf("%ld %ld\n", (tv_end.tv_sec - tv_begin.tv_sec),(tv_end.tv_usec - tv_begin.tv_usec));
-    //    arcfault_main();
+//    arcfault_main();
     return 0;
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 1, "RadiantCooker", strlen("RadiantCooker"));
 //    addToIdMap(gIdMaps, sizeof(gIdMaps) / sizeof(IdMap), 2, "Cleaner", strlen("Cleaner"));
@@ -274,7 +348,7 @@ int main() {
     /***
      * 识别流程开始
      */
-    //根据最新电压更新在线电器列表的功率
+//根据最新电压更新在线电器列表的功率
     updateOnlineListPowerByVol(220);
     MatchedAppliance m1, m2, m3, m4, m5;
     m1.activePower = 1000;
@@ -297,14 +371,14 @@ int main() {
     m5.id = 9;
     m5.possiblity = 0.9;
 
-    //本次的候选识别结果
+//本次的候选识别结果
     addToMatchedList(&m1);
     addToMatchedList(&m2);
     addToMatchedList(&m3);
     addToMatchedList(&m4);
     addToMatchedList(&m5);
 
-    //选取最大概率的识别结果
+//选取最大概率的识别结果
     signed char bestMatchedId = -1;
     float possibility = 0;
     getBestMatchedApp(-1000, &bestMatchedId, &possibility);

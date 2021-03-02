@@ -4,6 +4,7 @@
 #include "algo_set_build.h"
 #include "power_utils.h"
 #include "time_utils.h"
+#include "log_utils.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -168,6 +169,13 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
         if (errMsg != NULL) {
             sprintf(errMsg, "pc:%.2f %.2f", deltaActivePower, effU);
         }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("pc:%.2f %.2f\r\n", deltaActivePower, effU);
+        }
+#endif
+#endif
         return 0;
     }
 
@@ -175,14 +183,28 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
         if (errMsg != NULL) {
             sprintf(errMsg, "wl:%.2f", stActivePower);
         }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("wl:%.2f\r\n", stActivePower);
+        }
+#endif
+#endif
         return 0;
     }
 
-    //半波设备
+//半波设备
     if (deltaWf->extremeNum == 1 && deltaWf->flatNum >= minFlatNum) {
         if (errMsg != NULL) {
             sprintf(errMsg, "hfd: %d %d", deltaWf->extremeNum, deltaWf->flatNum);
         }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("hfd: %d %d\r\n", deltaWf->extremeNum, deltaWf->flatNum);
+        }
+#endif
+#endif
         return 2;
     }
 
@@ -191,6 +213,12 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     int isHeatingDevice = 0;
     if (powerFactor >= minPf && pulseI < maxPulseI && fft[0] / (fft[1] + LF) >= minFft1d3) {
         isHeatingDevice = 1;
+    } else {
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("pf:%.2f pi:%.2f\r\n", powerFactor, pulseI);
+        }
+#endif
     }
 
     if (isHeatingDevice) {
@@ -209,6 +237,13 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
                 if (errMsg != NULL) {
                     sprintf(errMsg, "fc:%.2f %.2f %.2f %.2f %.2f", fft[0], fft[1], fft[2], fft[3], fft[4]);
                 }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("fc:%.2f %.2f %.2f\r\n", fft[0], fft[1], fft[2]);
+                }
+#endif
+#endif
                 return 0;
             } else {
                 if (deltaReactivePower <= 80 && (activePower - deltaActivePower) < 1000) {
@@ -216,6 +251,13 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
                         sprintf(errMsg, "ad:%.2f %.2f %.2f", activePower, deltaActivePower,
                                 deltaReactivePower);
                     }
+#if TUOQIANG_DEBUG
+#if OUTLOG_ON
+                    if (outprintf != NULL) {
+                        outprintf("ad:%.2f %.2f %.2f\r\n", activePower, deltaActivePower, deltaReactivePower);
+                    }
+#endif
+#endif
                     return 0;
                 }
             }
