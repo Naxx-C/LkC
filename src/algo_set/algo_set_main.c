@@ -427,29 +427,29 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 //#endif
             //负荷投切事件
     int switchEventHappen = 0;
+    float absDeltaStandardPower = fabs(
+            getStandardPower(activePower, effU)
+                    - getStandardPower(gLastStableActivePower[channel], gLastStableUEff[channel]));
     if (isStable > gLastStable[channel]) {
         //投切事件发生
-        if (fabs(
-                getStandardPower(activePower, effU)
-                        - getStandardPower(gLastStableActivePower[channel], gLastStableUEff[channel]))
-                > gMinEventDeltaPower[channel]) {
+        if (absDeltaStandardPower > gMinEventDeltaPower[channel]) {
             switchEventHappen = 1;
         }
     }
-    if (isStable != gLastStable[channel]) {
+    if (isStable != gLastStable[channel] && absDeltaStandardPower > gMinEventDeltaPower[channel] / 2) {
         char msg[50] = { 0 };
-        sprintf(msg, "t=%d stable=%d ap=%.1f rp=%.1f s=%d", gTimer[channel], isStable, activePower,
+        sprintf(msg, "t=%d st=%d ap=%.1f rp=%.1f se=%d", gTimer[channel], isStable, activePower,
                 getReactivePower(activePower, effI * effU), switchEventHappen);
         if (strlen(msg) > 0 && extraMsg != NULL)
             strcpy(extraMsg, msg);
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("t=%d stable=%d ap=%.1f rp=%.1f s=%d\r\n", gTimer[channel], isStable, activePower,
+            outprintf("t=%d st=%d ap=%.1f rp=%.1f se=%d\r\n", gTimer[channel], isStable, activePower,
                     getReactivePower(activePower, effI * effU), switchEventHappen);
         }
 #endif
 #if LOG_ON == 1
-        printf("channel=%d timer=%d stable=%d ap=%.2f rp=%.2f\n", channel, gTimer[channel], isStable,
+        printf("channel=%d timer=%d st=%d ap=%.2f rp=%.2f\n", channel, gTimer[channel], isStable,
                 activePower, getReactivePower(activePower, effI * effU));
 #endif
     }
@@ -507,7 +507,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     //step:特征提取
     float deltaEffI = LF, deltaEffU = LF, iPulse = LF, deltaActivePower = LF, deltaReactivePower = LF;
     float deltaOddFft[5] = { LF, LF, LF, LF, LF }; //奇次谐波
-    int startupTime = 0; // 启动时间
+//    int startupTime = 0; // 启动时间
     int zeroCrossLast = -1, zeroCrossThis = -1; //上个周期及本个周期稳态电压穿越
     WaveFeature deltaWf;
     memset(&deltaWf, 0, sizeof(deltaWf));
@@ -531,7 +531,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         deltaReactivePower = getReactivePower(deltaActivePower, deltaEffI * deltaEffU);
 
         // feature3:
-        startupTime = gTransitTime[channel];
+//        startupTime = gTransitTime[channel];
 
         // feature4:
         iPulse = (gTransitTmpIMax[channel] - gLastStableIEff[channel]) / (effI - gLastStableIEff[channel]);
@@ -775,7 +775,7 @@ int initTpsonAlgoLib(void) {
         return -2;
 #if OUTLOG_ON
     if (outprintf != NULL) {
-        outprintf("init ok ^_^\r\n");
+        outprintf("init ok\r\n");
     }
 #endif
     return 0;

@@ -18,7 +18,7 @@
 #define TUOQIANG_DEBUG 0
 #if TUOQIANG_DEBUG
 #undef CHANNEL_NUM
-#define CHANNEL_NUM 1
+#define CHANNEL_NUM 3
 #undef DEBUG_ONLY
 #define DEBUG_ONLY 1
 #endif

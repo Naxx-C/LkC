@@ -51,6 +51,9 @@ int isPowerStable(float data[], int len, float absThresh, int relativeRatio) {
     }
     average /= len;
     absAverage = average >= 0 ? average : -average;
+    //平均功率小于20w,返回
+//    if (absAverage < 20)
+//      return 1;
     for (int i = 0; i < len; i++) {
         float absDelta = data[i] - average;
         absDelta = absDelta >= 0 ? absDelta : -absDelta;
@@ -70,7 +73,6 @@ int isPowerStable(float data[], int len, float absThresh, int relativeRatio) {
 float getStandardPower(float power, float vol) {
     return power * (220 * 220 / vol / vol);
 }
-
 
 //通过视在功率计算无功功率
 float getReactivePower(float activePower, float apparentPower) {

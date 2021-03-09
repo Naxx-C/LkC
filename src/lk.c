@@ -153,6 +153,10 @@ static void f2(int a){
 #define SIZE 100
 int main() {
 
+    static int a[SIZE];
+    for(int i=0;i<SIZE;i++)
+        printf("%d ",a[i]);
+
 //    int alarmAction[SIZE] = {//
 //            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
 //            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
@@ -174,8 +178,6 @@ int main() {
 //        printf("%d: %d\n", i + 1, smartmodeTimeTrigger);
 //    }
 
-    for (int i = 0; i < 3; i++)
-        f2(1);
     //24小时内触发4次以上
     registerPrintf(printf);
 
