@@ -246,8 +246,8 @@ int ArcCalFeature(int channel, float *current, int zeroPoint, const int length, 
         /*3、缓存特征*/
         AddCacheFeature(channel, &arcFeature);
 #if LOG_ON == 1
-        printf("\r\nArea1: %.1f\r\nArea2: %.1f\r\nArea3: %.1f\r\nIa:%.1f\r\n",
-            arcFeature.Area[0],arcFeature.Area[1],arcFeature.Area[2],effCurrent);
+        printf("Area1: %.1f Area2: %.1f Area3: %.1f Ia:%.1f\r\n", arcFeature.Area[0], arcFeature.Area[1],
+                arcFeature.Area[2], effCurrent);
 #endif
     }
 
@@ -288,8 +288,8 @@ int ArcStudyAnalysis(int channel, int mode) {
     }
 
 #if LOG_ON == 1
-    printf("\r\nPossible1: %.1f\r\nPossible2: %.1f\r\nPossible3: %.1f\r\n",
-        Possible[0],Possible[1],Possible[2]);
+    printf("\r\nPossible1: %.1f\r\nPossible2: %.1f\r\nPossible3: %.1f\r\n", Possible[0], Possible[1],
+            Possible[2]);
 #endif
 
     //超过半数已学习,不报警
@@ -304,10 +304,12 @@ int ArcStudyAnalysis(int channel, int mode) {
 #if LOG_ON == 1
                 printf("add new feature\r\n");
 #endif
+#if TMP_DEBUG
 #if OUTLOG_ON
                 if (outprintf != NULL) {
                     outprintf("add new feature\r\n");
                 }
+#endif
 #endif
                 AddArcFeature(channel, &ArcCacheData[channel][i]);
                 break;

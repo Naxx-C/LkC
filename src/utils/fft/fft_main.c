@@ -23,7 +23,6 @@ static void MakeInputLk(float *f) {
 }
 
 int fft_main(void) {
-    int i = 0;
 
     /* TEST FFT */
     MakeInput();

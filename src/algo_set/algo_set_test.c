@@ -30,7 +30,12 @@ static char gDirs[][100] = {
 //        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
 //        "F:\\Tmp\\charging_medium_lowratelk2",
 //        "F:\\Tmp\\arcfault_falsealarm\\diantaolu",
-        "F:\\data\\ArcfaultData\\category\\RealAlarm\\hairdryer" };
+//        "F:\\data\\ArcfaultData\\category\\RealAlarm\\hairdryer",
+//        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\diancilu",
+        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\tiaoyaqi",
+//        "F:\\data\\DormConverter\\category\\FalseAlarm\\diantaolu",
+//        "F:\\data\\DormConverter\\category\\RealAlarm",
+        };
 
 static int init() {
 
@@ -43,18 +48,16 @@ static int init() {
 //    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
 //    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
     setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
+//    setArcCheckDisabled(1);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {
         setChargingAlarmSensitivity(channel, CHARGING_ALARM_SENSITIVITY_MEDIUM);
-        setMaliLoadAlarmSensitivity(channel, MALI_LOAD_SENSITIVITY_HIGH);
+//        setMaliLoadAlarmSensitivity(channel, MALI_LOAD_SENSITIVITY_HIGH);
         setMinEventDeltaPower(channel, 55);
         setMinChargingDevicePower(channel, 55);
     }
-    addMaliciousLoadWhitelist(0, 450);
-    addMaliciousLoadWhitelist(0, 460);
-    addMaliciousLoadWhitelist(0, 500);
-    addMaliciousLoadWhitelist(0, 520);
-    removeFromMaliLoadWhitelist(0, 490);
+//    addMaliciousLoadWhitelist(0, 1000);
+//    setMaliLoadWhitelistMatchRatio(0, 0.7, 1.3);
     return 0;
 }
 

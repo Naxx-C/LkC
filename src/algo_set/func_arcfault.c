@@ -15,20 +15,20 @@
 /**
  * 可配区
  */
-static int gMinExtremeDis = 19; // 阻性电弧发生点到极值的最小距离
-static int gMinWidth = 35; // 阻性电弧发生点最少宽度
-static int gDelayCheckTime = 1000 / 20; // 延迟报警时间
-static float gResJumpRatio = 3.5f; // 阻性负载最少跳变threshDelta的倍数
-static int gAlarmThresh = 14; // 故障电弧报警阈值，大于10，默认14
-static int gDutyRatioThresh = 92;
-static int gArc2NumRatioThresh = 40;
-static int gMaxSeriesThresh = 25;
-static float gResFollowJumpMaxRatio = 3.5f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
-static float gInductJumpRatio = 3.3f; // 感性负载最少跳变threshDelta的倍数
-static float gResJumpThresh = 1.0f; // 阻性负载最小跳跃幅度，单位A
-static float gInductJumpThresh = 2.5; // 阻性负载最小跳跃幅度，单位A
-static float gInductMaxJumpRatio = 0.52; // 感性负载跳变值至少满足电流峰值的百分比
-static float gInductJumpMinThresh = 0.75f; // 感性负载待验证跳变值至少满足最大跳变值得百分比
+static int gMinExtremeDis[CHANNEL_NUM]; //19 阻性电弧发生点到极值的最小距离
+static int gMinWidth[CHANNEL_NUM]; // 35 阻性电弧发生点最少宽度
+static int gDelayCheckTime[CHANNEL_NUM]; // 50 延迟报警时间
+static float gResJumpRatio[CHANNEL_NUM]; //3.5f 阻性负载最少跳变threshDelta的倍数
+static int gAlarmThresh[CHANNEL_NUM]; // 14  故障电弧报警阈值，大于10，默认14
+static int gDutyRatioThresh[CHANNEL_NUM]; // 92
+static int gArc2NumRatioThresh[CHANNEL_NUM]; // 40
+static int gMaxSeriesThresh[CHANNEL_NUM]; // 25
+static float gResFollowJumpMaxRatio[CHANNEL_NUM]; // 3.5f 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
+static float gInductJumpRatio[CHANNEL_NUM]; // 3.3f 感性负载最少跳变threshDelta的倍数
+static float gResJumpThresh[CHANNEL_NUM]; // 1.0f 阻性负载最小跳跃幅度，单位A
+static float gInductJumpThresh[CHANNEL_NUM]; // 2.5  阻性负载最小跳跃幅度，单位A
+static float gInductMaxJumpRatio[CHANNEL_NUM]; // 0.52  感性负载跳变值至少满足电流峰值的百分比
+static float gInductJumpMinThresh[CHANNEL_NUM]; // 0.75f   感性负载待验证跳变值至少满足最大跳变值得百分比
 static char gFftEnabled = 0;
 static char gOverlayCheckEnabled = 0;
 static float gMaxCurrent = 100.0f;
@@ -92,52 +92,52 @@ void setArcfaultSensitivity(int channel, int sensitivity) {
     }
     switch (sensitivity) {
     case ARCFAULT_SENSITIVITY_HIGH:
-        gDelayCheckTime = 0;
-        gMinExtremeDis = 15; //越大越严
-        gMinWidth = 30; // 阻性电弧发生点最少宽度
-        gResJumpRatio = 2.8f;
-        gAlarmThresh = 10;
-        gDutyRatioThresh = 200;
-        gArc2NumRatioThresh = 200;
-        gMaxSeriesThresh = 200;
-        gResFollowJumpMaxRatio = 3.2f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
-        gInductJumpRatio = 3.0f; // 感性负载最少跳变threshDelta的倍数
-        gResJumpThresh = 0.9f; // 阻性负载最小跳跃幅度，单位A
-        gInductJumpThresh = 2.0f; // 感性负载最小跳跃幅度，单位A
-        gInductMaxJumpRatio = 0.40; // 越大越严，感性负载跳变值至少满足电流峰值的百分比，取50%低一点的值
-        gInductJumpMinThresh = 0.70f; // 越大越严，感性负载待验证跳变值至少满足最大跳变值得百分比
+        gDelayCheckTime[channel] = 0;
+        gMinExtremeDis[channel] = 15; //越大越严
+        gMinWidth[channel] = 30; // 阻性电弧发生点最少宽度
+        gResJumpRatio[channel] = 2.8f;
+        gAlarmThresh[channel] = 10;
+        gDutyRatioThresh[channel] = 200;
+        gArc2NumRatioThresh[channel] = 200;
+        gMaxSeriesThresh[channel] = 200;
+        gResFollowJumpMaxRatio[channel] = 3.2f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
+        gInductJumpRatio[channel] = 3.0f; // 感性负载最少跳变threshDelta的倍数
+        gResJumpThresh[channel] = 0.9f; // 阻性负载最小跳跃幅度，单位A
+        gInductJumpThresh[channel] = 2.0f; // 感性负载最小跳跃幅度，单位A
+        gInductMaxJumpRatio[channel] = 0.40; // 越大越严，感性负载跳变值至少满足电流峰值的百分比，取50%低一点的值
+        gInductJumpMinThresh[channel] = 0.70f; // 越大越严，感性负载待验证跳变值至少满足最大跳变值得百分比
         break;
     case ARCFAULT_SENSITIVITY_MEDIUM:
-        gDelayCheckTime = 1000 / 20;
-        gMinExtremeDis = 19;
-        gMinWidth = 35;
-        gResJumpRatio = 3.5f;
-        gAlarmThresh = 14;
-        gDutyRatioThresh = 92;
-        gArc2NumRatioThresh = 40;
-        gMaxSeriesThresh = 25;
-        gResFollowJumpMaxRatio = 3.5f;
-        gInductJumpRatio = 3.3f;
-        gResJumpThresh = 1.0f;
-        gInductJumpThresh = 2.5;
-        gInductMaxJumpRatio = 0.52;
-        gInductJumpMinThresh = 0.75f;
+        gDelayCheckTime[channel] = 1000 / 20;
+        gMinExtremeDis[channel] = 19;
+        gMinWidth[channel] = 35;
+        gResJumpRatio[channel] = 3.5f;
+        gAlarmThresh[channel] = 14;
+        gDutyRatioThresh[channel] = 92;
+        gArc2NumRatioThresh[channel] = 40;
+        gMaxSeriesThresh[channel] = 25;
+        gResFollowJumpMaxRatio[channel] = 3.5f;
+        gInductJumpRatio[channel] = 3.3f;
+        gResJumpThresh[channel] = 1.0f;
+        gInductJumpThresh[channel] = 2.5;
+        gInductMaxJumpRatio[channel] = 0.52;
+        gInductJumpMinThresh[channel] = 0.75f;
         break;
     case ARCFAULT_SENSITIVITY_LOW:
-        gDelayCheckTime = 1000 / 20;
-        gMinExtremeDis = 20;
-        gMinWidth = 36;
-        gResJumpRatio = 4.0f;
-        gAlarmThresh = 14;
-        gDutyRatioThresh = 90;
-        gArc2NumRatioThresh = 35;
-        gMaxSeriesThresh = 20;
-        gResFollowJumpMaxRatio = 3.8f;
-        gInductJumpRatio = 3.8f;
-        gResJumpThresh = 1.5f;
-        gInductJumpThresh = 3.0f;
-        gInductMaxJumpRatio = 0.7f;
-        gInductJumpMinThresh = 0.8f;
+        gDelayCheckTime[channel] = 1000 / 20;
+        gMinExtremeDis[channel] = 20;
+        gMinWidth[channel] = 36;
+        gResJumpRatio[channel] = 4.0f;
+        gAlarmThresh[channel] = 14;
+        gDutyRatioThresh[channel] = 90;
+        gArc2NumRatioThresh[channel] = 35;
+        gMaxSeriesThresh[channel] = 20;
+        gResFollowJumpMaxRatio[channel] = 3.8f;
+        gInductJumpRatio[channel] = 3.8f;
+        gResJumpThresh[channel] = 1.5f;
+        gInductJumpThresh[channel] = 3.0f;
+        gInductMaxJumpRatio[channel] = 0.7f;
+        gInductJumpMinThresh[channel] = 0.8f;
         break;
     default:
         break;
@@ -393,7 +393,6 @@ int initFuncArcfault(void) {
     for (int i = 0; i < CHANNEL_NUM; i++) {
         gStatus[i] = STATUS_NORMAL;
         gIsFirst[i] = 1;
-        gCheckEnabled[i] = 1;
         gSensitivity[i] = ARCFAULT_SENSITIVITY_MEDIUM;
         gSmartMode[i] = ARCFAULT_SMARTMODE_ON;
         gSmartmodeLearningTime[i] = 0;
@@ -402,6 +401,25 @@ int initFuncArcfault(void) {
         gLastTimeTriggerSectionTime[i] = 0;
         gLastTimeTriggerAlarmAuditTime[i] = 0;
         gArcLastAlarmTime[i] = 0;
+
+        //算法阈值参数
+        gMinExtremeDis[i] = 19; // 阻性电弧发生点到极值的最小距离
+        gMinWidth[i] = 35; // 阻性电弧发生点最少宽度
+        gDelayCheckTime[i] = 1000 / 20; // 延迟报警时间
+        gResJumpRatio[i] = 3.5f; // 阻性负载最少跳变threshDelta的倍数
+        gAlarmThresh[i] = 14; // 故障电弧报警阈值，大于10，默认14
+        gDutyRatioThresh[i] = 92;
+        gArc2NumRatioThresh[i] = 40;
+        gMaxSeriesThresh[i] = 25;
+        gResFollowJumpMaxRatio[i] = 3.5f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
+        gInductJumpRatio[i] = 3.3f; // 感性负载最少跳变threshDelta的倍数
+        gResJumpThresh[i] = 1.0f; // 阻性负载最小跳跃幅度，单位A
+        gInductJumpThresh[i] = 2.5; // 阻性负载最小跳跃幅度，单位A
+        gInductMaxJumpRatio[i] = 0.52; // 感性负载跳变值至少满足电流峰值的百分比
+        gInductJumpMinThresh[i] = 0.75f; // 感性负载待验证跳变值至少满足最大跳变值得百分比
+    }
+    for (int i = 0; i < CHECK_ITEM_NUM; i++) {
+        gCheckEnabled[i] = 1;
     }
 
     //内存分配失败
@@ -467,14 +485,14 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
     float threshDelta = getThreshAverage(d1abs, 128, averageDelta / 2); // 除去平肩部分
 
     float health = getHealth(d1, d1abs, 128, averageDelta / 3);
-    if (maxD1abs > threshDelta * gResJumpRatio && maxD1abs > gResJumpThresh) {
+    if (maxD1abs > threshDelta * gResJumpRatio[channel] && maxD1abs > gResJumpThresh[channel]) {
         pBigJumpCounter[channel]++;
     }
     if (health >= 76.0f && effValue >= gMinCurrent && effValue <= gMaxCurrent) {
         // 最后3个点的电弧信息缺少，容易误判，忽略
         const int PARTIAL_MAX_INDEX = 3;
         for (int i = 1; i < 128 - PARTIAL_MAX_INDEX; i++) {
-            if (d1abs[i] > gResJumpRatio * threshDelta && d1abs[i] >= gResJumpThresh) {
+            if (d1abs[i] > gResJumpRatio[channel] * threshDelta && d1abs[i] >= gResJumpThresh[channel]) {
 
                 int checkFailed = 0, easyCheckFailed = 0; // 两套标准，其中一套略宽松标准
                 int faultIndex = i;
@@ -524,7 +542,7 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                 int extIndex = faultIndex;
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_EXTR]) {
 
-                    int minExtremeDis = gMinExtremeDis;
+                    int minExtremeDis = gMinExtremeDis[channel];
                     if (maybeOverlay) {
                         minExtremeDis /= 2;
                     }
@@ -543,9 +561,9 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                 // 有可能极值点通过，但波形从极值点迅速下降
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_WIDT]) {
 
-                    int minWidth = gMinWidth;
+                    int minWidth = gMinWidth[channel];
                     if (maybeOverlay) {
-                        minWidth = gMinWidth / 2;
+                        minWidth = gMinWidth[channel] / 2;
                     }
                     if (getWidth(current, 128, faultIndex) >= minWidth) {
                         // pass
@@ -565,7 +583,7 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                 // 离散跳跃check，此后的跳跃*Ratio不可以比当前跳跃还大
                 if (checkFailed == 0 && gCheckEnabled[ARC_CON_POSJ]) {
                     for (int j = i + 1; j < i + PARTIAL_MAX_INDEX && j < 128; j++) {
-                        if (d1abs[j] * gResFollowJumpMaxRatio >= d1abs[i]) {
+                        if (d1abs[j] * gResFollowJumpMaxRatio[channel] >= d1abs[i]) {
                             checkFailed = ARC_CON_POSJ;
                             break;
                         }
@@ -575,6 +593,11 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                 if (checkFailed == 0) {
                     resArcNum++;
                 }
+#if LOG_ON
+                else
+                    printf("failed=%d index=%d I=%.2f\n", checkFailed, gTimer[channel] * 128 + faultIndex,
+                            current[faultIndex]);
+#endif
                 if (easyCheckFailed == 0) {
                     easyArcNum++;
                 }
@@ -585,14 +608,14 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
         // 感性负载检查
         if (resArcNum == 0) {
 
-            if (maxD1abs > gInductJumpRatio * threshDelta && maxD1abs >= gInductJumpThresh
-                    && maxD1abs >= maxPoint * gInductMaxJumpRatio
-                    && maxD1abs >= -minPoint * gInductMaxJumpRatio) {
+            if (maxD1abs > gInductJumpRatio[channel] * threshDelta && maxD1abs >= gInductJumpThresh[channel]
+                    && maxD1abs >= maxPoint * gInductMaxJumpRatio[channel]
+                    && maxD1abs >= -minPoint * gInductMaxJumpRatio[channel]) {
                 float lastBigJump = 0;
                 int lastBigJumpIndex = -1;
                 for (int i = 0; i < 128; i++) {
 
-                    if (d1abs[i] > maxD1abs * gInductJumpMinThresh) {
+                    if (d1abs[i] > maxD1abs * gInductJumpMinThresh[channel]) {
                         // 在正半周，跳变pair第一跳向下,第二跳向上
                         // 或者跳完之后波形是顺着跳跃方向连续递减的
                         // 两跳之间最多间隔7个点(必要条件)
@@ -691,10 +714,11 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
     switch (gStatus[channel]) {
     case STATUS_NORMAL:
         // 进入免疫状态：1.占空比过大 2.一个周期检测到双弧超过40% 3.最大连续序列过长
-        if (arcNum1S >= gAlarmThresh) {
+        if (arcNum1S >= gAlarmThresh[channel]) {
             // 占空比不可以太高；1个全波内同时检测出2个电弧的比例不能太高；最大连续序列不能太大；高次谐波比不能是稳定态
-            if (dutyRatio >= gDutyRatioThresh || have2Number * 100 / totalLen >= gArc2NumRatioThresh
-                    || maxSeries >= gMaxSeriesThresh
+            if (dutyRatio >= gDutyRatioThresh[channel]
+                    || have2Number * 100 / totalLen >= gArc2NumRatioThresh[channel]
+                    || maxSeries >= gMaxSeriesThresh[channel]
                     || (gFftEnabled && getLastestFluctuation(gHarmonicBuff[channel],
                     MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
                 gStatus[channel] = STATUS_IMMUNE;
@@ -725,7 +749,7 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
         }
         break;
     case STATUS_WAITING_CHECK:
-        if (gTimer[channel] - gWatingTime[channel] > gDelayCheckTime) {
+        if (gTimer[channel] - gWatingTime[channel] > gDelayCheckTime[channel]) {
             gStatus[channel] = STATUS_NORMAL;
             if (effValue > 1.5f) {
                 pAlarmCounter[channel]++;
@@ -734,9 +758,10 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                 alarmAction = ARCFAULT_ACTION_ALARM;
                 break;
             }
-        } else if (dutyRatio >= gDutyRatioThresh || have2Number * 100 / totalLen >= gArc2NumRatioThresh
-                || maxSeries >= gMaxSeriesThresh
-                || (gFftEnabled && resArcNum1S >= gAlarmThresh / 3 && harmonic < 15
+        } else if (dutyRatio >= gDutyRatioThresh[channel]
+                || have2Number * 100 / totalLen >= gArc2NumRatioThresh[channel]
+                || maxSeries >= gMaxSeriesThresh[channel]
+                || (gFftEnabled && resArcNum1S >= gAlarmThresh[channel] / 3 && harmonic < 15
                         && getLastestFluctuation(gHarmonicBuff[channel],
                         MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
             gStatus[channel] = STATUS_IMMUNE;
@@ -793,12 +818,10 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
             if (arcNum1S >= gSmartmodeNumTriggerPerSecond) {
                 gSmartmodeNumTrigger[channel]++;
                 gNumTriggerMissedCounter[channel] = 0;
-#if TMP_DEBUG
 #if OUTLOG_ON
                 if (outprintf != NULL) {
-                    outprintf("nc=%d\r\n", gSmartmodeNumTrigger[channel]);
+                    outprintf("nc=%d gt=%d\r\n", gSmartmodeNumTrigger[channel],gTimer[channel]);
                 }
-#endif
 #endif
             } else {
                 if (gNumTriggerMissedCounter[channel] < 5)
@@ -815,14 +838,12 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
         && gSmartmodeLearningTime[channel] <= 0 && alarmAction == ARCFAULT_ACTION_ALARM) {
             startArcLearning(channel);
         }
-#ifdef TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
             if (smartmodeTimeTrigger >= 1 && smartmodeTimeTrigger != lastSmartmodeTimeTrigger[channel])
                 outprintf("smartmodeTimeTrigger[%d]=%d last=%d\r\n", channel, smartmodeTimeTrigger,
                         lastSmartmodeTimeTrigger[channel]);
         }
-#endif
 #endif
         lastSmartmodeTimeTrigger[channel] = smartmodeTimeTrigger;
         // 连续1分钟电弧数超过阈值,进入学习模式
@@ -857,59 +878,73 @@ int setArcfaultSmartMode(int channel, int mode) {
 }
 
 void setArcMinExtremeDis(int minExtremeDis) {
-    gMinExtremeDis = minExtremeDis;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gMinExtremeDis[i] = minExtremeDis;
 }
 
 void setArcMinWidth(int minWidth) {
-    gMinWidth = minWidth;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gMinWidth[i] = minWidth;
 }
 
 void setArcDelayCheckTime(int delayCheckTime) {
-    gDelayCheckTime = delayCheckTime;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gDelayCheckTime[i] = delayCheckTime;
 }
 
 void setArcResJumpRatio(float resJumpRatio) {
-    gResJumpRatio = resJumpRatio;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gResJumpRatio[i] = resJumpRatio;
 }
 
 void setArcAlarmThresh(int alarmThresh) {
-    gAlarmThresh = alarmThresh;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gAlarmThresh[i] = alarmThresh;
 }
 
 void setArcDutyRatioThresh(int dutyRatioThresh) {
-    gDutyRatioThresh = dutyRatioThresh;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gDutyRatioThresh[i] = dutyRatioThresh;
 }
 
 void setArcArc2InWaveRatioThresh(int arc2NumRatioThresh) {
-    gArc2NumRatioThresh = arc2NumRatioThresh;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gArc2NumRatioThresh[i] = arc2NumRatioThresh;
 }
 
 void setArcMaxSeriesThresh(int maxSeriesThresh) {
-    gMaxSeriesThresh = maxSeriesThresh;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gMaxSeriesThresh[i] = maxSeriesThresh;
 }
 
 void setArcResFollowJumpMaxRatio(float resFollowJumpMaxRatio) {
-    gResFollowJumpMaxRatio = resFollowJumpMaxRatio;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gResFollowJumpMaxRatio[i] = resFollowJumpMaxRatio;
 }
 
 void setArcInductJumpRatio(float inductJumpRatio) {
-    gInductJumpRatio = inductJumpRatio;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gInductJumpRatio[i] = inductJumpRatio;
 }
 
 void setArcResJumpThresh(float resJumpThresh) {
-    gResJumpThresh = resJumpThresh;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gResJumpThresh[i] = resJumpThresh;
 }
 
 void setArcInductJumpThresh(float inductJumpThresh) {
-    gInductJumpThresh = inductJumpThresh;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gInductJumpThresh[i] = inductJumpThresh;
 }
 
 void setArcInductMaxJumpRatio(float inductMaxJumpRatio) {
-    gInductMaxJumpRatio = inductMaxJumpRatio;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gInductMaxJumpRatio[i] = inductMaxJumpRatio;
 }
 
 void setArcInductJumpMinThresh(float inductJumpMinThresh) {
-    gInductJumpMinThresh = inductJumpMinThresh;
+    for (int i = 0; i < CHANNEL_NUM; i++)
+        gInductJumpMinThresh[i] = inductJumpMinThresh;
 }
 
 void setArcFftEnabled(char fftEnabled) {

@@ -442,15 +442,17 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
                 getReactivePower(activePower, effI * effU), switchEventHappen);
         if (strlen(msg) > 0 && extraMsg != NULL)
             strcpy(extraMsg, msg);
+#if TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("t=%d st=%d ap=%.1f rp=%.1f se=%d\r\n", gTimer[channel], isStable, activePower,
                     getReactivePower(activePower, effI * effU), switchEventHappen);
         }
 #endif
+#endif
 #if LOG_ON == 1
-        printf("channel=%d timer=%d st=%d ap=%.2f rp=%.2f\n", channel, gTimer[channel], isStable,
-                activePower, getReactivePower(activePower, effI * effU));
+        printf("channel=%d timer=%d st=%d ap=%.2f rp=%.2f\n", channel, gTimer[channel], isStable, activePower,
+                getReactivePower(activePower, effI * effU));
 #endif
     }
     //负荷有功/无功缓慢上升事件
@@ -548,11 +550,10 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
             strcat(extraMsg, msg);
         }
 #if LOG_ON == 1
-        printf(
-                "ext=%d flat=%d iPulse=%.2f lpap=%.2f st=%d dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f %.2f %.2f]\n",
+        printf("ext=%d flat=%d iPulse=%.2f lpap=%.2f dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f %.2f %.2f]\n",
                 deltaWf.extremeNum, deltaWf.flatNum, iPulse, gLastProcessedStableActivePower[channel],
-                startupTime, deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1],
-                deltaOddFft[2], deltaOddFft[3], deltaOddFft[4]);
+                deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2],
+                deltaOddFft[3], deltaOddFft[4]);
 #endif
     }
 
@@ -575,7 +576,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 #endif
 #if OUTLOG_ON
                 if (outprintf != NULL) {
-                    outprintf("DormConverter detected\r\n");
+                    outprintf("DormConverter adjusting detected\r\n");
                 }
 #endif
                 gDormConverterLastAlarmTime[channel] = unixTimestamp;

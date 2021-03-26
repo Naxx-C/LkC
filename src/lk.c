@@ -153,9 +153,10 @@ static void f2(int a){
 #define SIZE 100
 int main() {
 
-    static int a[SIZE];
-    for(int i=0;i<SIZE;i++)
-        printf("%d ",a[i]);
+    printf("start\n");
+//    static int a[SIZE];
+//    for(int i=0;i<SIZE;i++)
+//        printf("%d ",a[i]);
 
 //    int alarmAction[SIZE] = {//
 //            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
@@ -184,7 +185,9 @@ int main() {
 //    if (algoset_printf != NULL)
 //        algoset_printf("hello %d\n", 1);
 //    setArcCurrentRange(1.0f, 4.0f);
-//    algo_set_test();
+    algo_set_test();
+
+    printf("done\n");
     return 0;
 
 //    charging_alarm_main();

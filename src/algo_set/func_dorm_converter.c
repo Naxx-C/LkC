@@ -69,7 +69,7 @@ int dormConverterAdjustingCheck(int channel, float activePower, float reactivePo
     if (gPresetMinPower[channel] > 0) {
         minActivePower = gPresetMinPower[channel];
     }
-    if (gPresetMaxPower > 0) {
+    if (gPresetMaxPower[channel] > 0) {
         maxActivePower = gPresetMaxPower[channel];
     }
 
@@ -120,8 +120,18 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
         break;
     }
 
+    //功率阈值,手动配置更新
+    if (gPresetMinPower[channel] > 0) {
+        minActivePower = gPresetMinPower[channel];
+    }
+
+    float maxActivePower = 3000.0f;
+    if (gPresetMaxPower[channel] > 0) {
+        maxActivePower = gPresetMaxPower[channel];
+    }
+
     //功率判断
-    if (deltaActivePower < minActivePower || deltaReactivePower < minReactivePower) {
+    if (deltaActivePower < minActivePower || deltaActivePower > maxActivePower || deltaReactivePower < minReactivePower) {
         if (errMsg != NULL) {
             sprintf(errMsg, "dap=%.2f drp=%.2f", deltaActivePower, deltaReactivePower);
         }

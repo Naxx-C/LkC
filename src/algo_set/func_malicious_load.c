@@ -147,7 +147,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
         minPf = 0.97f;
         minFlatNum = 14;
         maxPulseI = 1.09f;
-        minFft1d3 = 17.5f;
+        minFft1d3 = 17.0f;
         maxHarmRatio = 0.12f;
         minAcReactivePower = 205;
         break;
@@ -155,7 +155,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
         minPf = 0.95f;
         minFlatNum = 13;
         maxPulseI = 1.12f;
-        minFft1d3 = 16;
+        minFft1d3 = 13;
         maxHarmRatio = 0.13f;
         minAcReactivePower = 190;
         break;
@@ -214,10 +214,12 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     if (powerFactor >= minPf && pulseI < maxPulseI && fft[0] / (fft[1] + LF) >= minFft1d3) {
         isHeatingDevice = 1;
     } else {
+#if TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("pf:%.2f pi:%.2f\r\n", powerFactor, pulseI);
+            outprintf("pf:%.2f pi:%.2f f:%.1f\r\n", powerFactor, pulseI, fft[0] / (fft[1] + LF));
         }
+#endif
 #endif
     }
 
@@ -237,7 +239,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
                 if (errMsg != NULL) {
                     sprintf(errMsg, "fc:%.2f %.2f %.2f %.2f %.2f", fft[0], fft[1], fft[2], fft[3], fft[4]);
                 }
-#if TUOQIANG_DEBUG
+#if TMP_DEBUG
 #if OUTLOG_ON
                 if (outprintf != NULL) {
                     outprintf("fc:%.2f %.2f %.2f\r\n", fft[0], fft[1], fft[2]);
@@ -251,7 +253,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
                         sprintf(errMsg, "ad:%.2f %.2f %.2f", activePower, deltaActivePower,
                                 deltaReactivePower);
                     }
-#if TUOQIANG_DEBUG
+#if TMP_DEBUG
 #if OUTLOG_ON
                     if (outprintf != NULL) {
                         outprintf("ad:%.2f %.2f %.2f\r\n", activePower, deltaActivePower, deltaReactivePower);
