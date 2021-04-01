@@ -10,7 +10,6 @@
 //#define ARM_MATH_CM4
 #define LOG_ON 0
 #define OUTLOG_ON 1//对外输出的打印
-#define DISABLE_FFT 0//禁用FFT计算,兼容一些低性能平台
 #define TMP_DEBUG 0
 
 /**客户化配置*/

@@ -54,7 +54,7 @@ void addMaliciousLoadWhitelist(int channel, float power) {
     if (power <= 0)
         return;
 
-    for (int i = 0; i < gPowerWhitelistNum[channel]; i++) {
+    for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
         //已存在,返回
         if (fabs(power - gPowerWhitelist[channel][i]) < 10) {
             return;
@@ -68,9 +68,9 @@ void addMaliciousLoadWhitelist(int channel, float power) {
 }
 
 //查询区间内功率最接近的白名单并移除
-void removeFromMaliLoadWhitelist(int channel, float power) {
+int removeFromMaliLoadWhitelist(int channel, float power) {
     if (power <= 0)
-        return;
+        return 0;
 
     int minDeltaIndex = -1;
     float minDelta = 10000, tmp, ratio;
@@ -91,7 +91,7 @@ void removeFromMaliLoadWhitelist(int channel, float power) {
     }
 
     if (minDeltaIndex < 0)
-        return;
+        return 0;
 
     for (int i = minDeltaIndex; i < POWER_WHITELIST_SIZE - 1; i++) {
         gPowerWhitelist[channel][i] = gPowerWhitelist[channel][i + 1];
@@ -101,11 +101,12 @@ void removeFromMaliLoadWhitelist(int channel, float power) {
     if (gPowerWhitelistNum[channel] > 0) {
         gPowerWhitelistNum[channel]--;
     }
+    return 1;
 }
 
-int getMaliciousLoadWhitelist(int channel, float outWhilelist[10]) {
+int getMaliciousLoadWhitelist(int channel, float *outWhilelist) {
     int outIndex = 0;
-    for (int i = 0; i < gPowerWhitelistNum[channel] && outIndex < 10; i++) {
+    for (int i = 0; i < POWER_WHITELIST_SIZE && outIndex < 10; i++) {
         if (gPowerWhitelist[channel][i] > LF) {
             outWhilelist[outIndex++] = gPowerWhitelist[channel][i];
         }
@@ -117,7 +118,9 @@ static int isInMaliciousLoadWhitelist(int channel, float power) {
     if (power <= 0)
         return 0;
     for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
-        float ratio = gPowerWhitelist[channel][i] / power;
+        if (gPowerWhitelist[channel][i] < LF)
+            continue;
+        float ratio = power / gPowerWhitelist[channel][i];
         if (ratio >= gPowerMinRatio[channel] && ratio <= gPowerMaxRatio[channel]) {
             return 1;
         }

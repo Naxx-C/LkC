@@ -145,6 +145,14 @@ void setArcfaultSensitivity(int channel, int sensitivity) {
 }
 
 static int getSmartModeTimeTriggerTimes(int channel, int alarmAction, int unixTime) {
+    //时间异常保护，防止时间配置引起的逻辑错误
+    if (unixTime < gLastTimeTriggerSectionTime[channel]) { //当前时间小于上次记录的整时时间
+        gLastTimeTriggerSectionTime[channel] = 0;
+    }
+    if (unixTime < gLastTimeTriggerAlarmAuditTime[channel]) { //当前时间小于上次报警触发的记录时间
+        gLastTimeTriggerAlarmAuditTime[channel] = 0;
+    }
+
     if (unixTime - gLastTimeTriggerSectionTime[channel] >= HOUR) {
         if (gTimeTriggerBuffIndex[channel] >= ARC_TIME_TRIGGER_BUFFSIZE
                 || gTimeTriggerBuffIndex[channel] < 0) {
@@ -167,7 +175,7 @@ static int getSmartModeTimeTriggerTimes(int channel, int alarmAction, int unixTi
         }
 
         gTimeTriggerBuffIndex[channel]++;
-        gLastTimeTriggerSectionTime[channel] = unixTime; //上一次处理记录时间
+        gLastTimeTriggerSectionTime[channel] = unixTime; //上一次整时处理时间
     } else if (alarmAction == 1) {
         int lastIndex = gTimeTriggerBuffIndex[channel] - 1;
         if (lastIndex < 0) {
@@ -820,7 +828,7 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                 gNumTriggerMissedCounter[channel] = 0;
 #if OUTLOG_ON
                 if (outprintf != NULL) {
-                    outprintf("nc=%d gt=%d\r\n", gSmartmodeNumTrigger[channel],gTimer[channel]);
+                    outprintf("nc=%d gt=%d\r\n", gSmartmodeNumTrigger[channel], gTimer[channel]);
                 }
 #endif
             } else {

@@ -304,12 +304,10 @@ int ArcStudyAnalysis(int channel, int mode) {
 #if LOG_ON == 1
                 printf("add new feature\r\n");
 #endif
-#if TMP_DEBUG
 #if OUTLOG_ON
                 if (outprintf != NULL) {
                     outprintf("add new feature\r\n");
                 }
-#endif
 #endif
                 AddArcFeature(channel, &ArcCacheData[channel][i]);
                 break;

@@ -1,6 +1,7 @@
 #include "func_charging_alarm.h"
 #include "algo_base_struct.h"
 #include "math_utils.h"
+#include "log_utils.h"
 #include "algo_set_build.h"
 
 #include <string.h>
@@ -108,18 +109,26 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
 
     if (deltaActivePower < minActivePower || deltaActivePower > maxActivePower || pulseI < pulseIThresh
             || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1 || fft[1] * 1.05f > fft[0]) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "da=%.0f pi=%.1f fr=%.2f f1=%.2f f3=%.2f", deltaActivePower, pulseI,
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("da=%.0f pi=%.1f fr=%.2f f1=%.2f f3=%.2f", deltaActivePower, pulseI,
                     (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f), fft[0], fft[1]);
         }
+#endif
+#endif
         return 0;
     }
 
     //无功功率判断
     if (deltaReactivePower < minReactivePower) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "rp=%.0f", deltaReactivePower);
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("rp=%.0f", deltaReactivePower);
         }
+#endif
+#endif
         return 0;
     }
 
@@ -132,24 +141,36 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         }
     }
     if (minTheta > thetaThresh) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "th=%.1f", minTheta);
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("th=%.1f", minTheta);
         }
+#endif
+#endif
         return 0;
     }
 
     if (wf->flatNum < minFlat || wf->extremeNum < minExtreme || wf->extremeNum > maxExtreme) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "fn=%d en=%d", wf->flatNum, wf->extremeNum);
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("fn=%d en=%d", wf->flatNum, wf->extremeNum);
         }
+#endif
+#endif
         return 0;
     }
 
     //排除斩波电路干扰. 斩波会从平肩直接跳变到最大值，充电会有个上升过程
     if (wf->maxDelta >= wf->maxValue * maxDeltaRatio) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "mad=%.2f mav=%.2f", wf->maxDelta, wf->maxValue);
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("mad=%.2f mav=%.2f", wf->maxDelta, wf->maxValue);
         }
+#endif
+#endif
         return 0;
     }
 
@@ -173,16 +194,22 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         break;
     }
     if (checkPass == 0) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "near=%d %d %d %d", wf->maxLeftNum, wf->maxRightNum, wf->minLeftNum,
-                    wf->minRightNum);
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("near=%d %d %d %d", wf->maxLeftNum, wf->maxRightNum, wf->minLeftNum, wf->minRightNum);
         }
+#endif
+#endif
         return 0;
     }
-
-    if (errMsg != NULL) {
-        sprintf(errMsg, "charging detected fn=%d en=%d", wf->flatNum, wf->extremeNum);
+#ifdef TMP_DEBUG
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("charging detected fn=%d en=%d", wf->flatNum, wf->extremeNum);
     }
+#endif
+#endif
     return 1;
 }
 

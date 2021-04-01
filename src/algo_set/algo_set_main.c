@@ -96,7 +96,13 @@ int setModuleEnable(int module, int enable) {
     default:
         return -1;
     }
-
+#if TMP_DEBUG
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("module=%d enable=%d\r\n", module, enable);
+    }
+#endif
+#endif
     return 0;
 }
 
@@ -338,7 +344,7 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
     //最大跳变和最大值
     float maxDelta = 0, maxValue = 0;
     for (int i = curStart; i < curStart + 127; i++) {
-        float delta = cur[i] - cur[i - 1];
+        float delta = cur[i + 1] - cur[i];
         if (delta > maxDelta) {
             maxDelta = delta;
         }

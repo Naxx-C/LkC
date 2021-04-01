@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "log_utils.h"
+#include "type_utils.h"
+#include "algo_set.h"
 
 typedef struct {
     int a;
@@ -144,19 +146,48 @@ static int getSmartModeTimeTriggerTimes(int channel, int alarmAction, int unixTi
     return smartmodeTimeTrigger;
 }
 
-static void f2(int a){
-    static int b=0;
-    b += a;
-    printf("%d\n",b);
+// 针对进烟速度的惩罚
+static float speedPulish(float data, float base) {
+
+//    return data;
+    int pulishR = 20;
+    return (base + (data - base) * (float) pulishR / 100);
 }
 
 #define SIZE 100
+#define  N 100
+
 int main() {
 
     printf("start\n");
-//    static int a[SIZE];
-//    for(int i=0;i<SIZE;i++)
-//        printf("%d ",a[i]);
+
+    float alarmThresh = 30;
+    float a02[N] = { 0 }, a10[N] = { 0 }, c02[N] = { 0 }, c10[N] = { 0 };
+
+    int alarmTime11 = 0, alarmTime12 = 0, alarmTime21 = 0, alarmTime22 = 0;
+    for (int i = 0; i < N; i++) {
+        a02[i] = i;
+        a10[i] = 1.6 * i;
+
+        if (a02[i] >= alarmThresh && alarmTime11 == 0)
+            alarmTime11 = i;
+        if (a10[i] >= alarmThresh && alarmTime12 == 0)
+            alarmTime12 = i;
+
+        if (i >= 6) {
+            c02[i] = speedPulish(a02[i], a02[i - 6]);
+            c10[i] = speedPulish(a10[i], a10[i - 6]);
+        }
+
+        if (c02[i] >= alarmThresh && alarmTime21 == 0)
+            alarmTime21 = i;
+        if (c10[i] >= alarmThresh && alarmTime22 == 0)
+            alarmTime22 = i;
+    }
+    printf("%d %d %d %d  ratio=%.1f vs %.1f\n", alarmTime11, alarmTime12, alarmTime21, alarmTime22,
+            (float) alarmTime11 / alarmTime12, (float) alarmTime21 / alarmTime22);
+
+//    1.0 vs 1.4
 
 //    int alarmAction[SIZE] = {//
 //            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
@@ -182,10 +213,7 @@ int main() {
     //24小时内触发4次以上
     registerPrintf(printf);
 
-//    if (algoset_printf != NULL)
-//        algoset_printf("hello %d\n", 1);
-//    setArcCurrentRange(1.0f, 4.0f);
-    algo_set_test();
+//    algo_set_test();
 
     printf("done\n");
     return 0;

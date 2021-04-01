@@ -28,12 +28,11 @@ static char gDirs[][100] = {
 //        "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
 //        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
 //        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
-//        "F:\\Tmp\\charging_medium_lowratelk2",
 //        "F:\\Tmp\\arcfault_falsealarm\\diantaolu",
 //        "F:\\data\\ArcfaultData\\category\\RealAlarm\\hairdryer",
 //        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\diancilu",
-        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\tiaoyaqi",
-//        "F:\\data\\DormConverter\\category\\FalseAlarm\\diantaolu",
+//        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\tiaoyaqi",
+        "F:\\data\\DormConverter\\category\\FalseAlarm\\diantaolu",
 //        "F:\\data\\DormConverter\\category\\RealAlarm",
         };
 
@@ -44,10 +43,10 @@ static int init() {
         printf("initerr=%d\n", initRet);
     }
 
-//    setModuleEnable(ALGO_CHARGING_DETECT, 1);
+    setModuleEnable(ALGO_CHARGING_DETECT, 1);
 //    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
 //    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
-    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
+//    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 //    setArcCheckDisabled(1);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {

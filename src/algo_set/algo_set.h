@@ -76,11 +76,18 @@ void setMaliLoadAlarmSensitivity(int channel, int mode);
  * power: 白名单电器的功率
  */
 void addMaliciousLoadWhitelist(int channel, float power);
+/**
+ * 获取当前白名单
+ * 返回实际白名单的个数
+ * outWhilelist为长度为10的float数组
+ */
+int getMaliciousLoadWhitelist(int channel, float* outWhilelist);
 /*
  * 将电器从白名单删除(自动寻找最匹配的删除,不需要严格一致)
+ * 移除成功返回1，没有匹配返回0
  * power: 电器的功率
  */
-void removeFromMaliLoadWhitelist(int channel, float power); //remove the best matched power
+int removeFromMaliLoadWhitelist(int channel, float power); //remove the best matched power
 //设置白名单电器功率误差范围,默认min=0.9,max=1.1
 void setMaliLoadWhitelistMatchRatio(int channel, float minRatio, float maxRatio);
 //设置恶性负载最小检测范围,默认200w
