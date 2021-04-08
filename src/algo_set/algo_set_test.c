@@ -1,6 +1,7 @@
 #include "file_utils.h"
 #include "string_utils.h"
 #include "algo_set_build.h"
+#include "algo_set_internal.h"
 #include "func_arcfault.h"
 #include "time_utils.h"
 #include "algo_set.h"
@@ -25,16 +26,17 @@
 static char gDirs[][100] = {
 //        "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charginglk2",
 //        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
-//        "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
+//        "F:\\Tmp\\maliload_dianchuifeng", "F:\\Tmp\\maliload_reshuiqi",
 //        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
 //        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
 //        "F:\\Tmp\\arcfault_falsealarm\\diantaolu",
 //        "F:\\data\\ArcfaultData\\category\\RealAlarm\\hairdryer",
 //        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\diancilu",
 //        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\tiaoyaqi",
-        "F:\\data\\DormConverter\\category\\FalseAlarm\\diantaolu",
+//        "F:\\data\\DormConverter\\category\\FalseAlarm\\diantaolu",
 //        "F:\\data\\DormConverter\\category\\RealAlarm",
-        };
+//        "F:\\data\\DormConverter\\category\\MissAlarm",
+        "F:\\data\\ChargingAlarm\\category\\FalseAlarm" };
 
 static int init() {
 
@@ -43,11 +45,13 @@ static int init() {
         printf("initerr=%d\n", initRet);
     }
 
-    setModuleEnable(ALGO_CHARGING_DETECT, 1);
+//    setModuleEnable(ALGO_CHARGING_DETECT, 1);
+    setModuleEnable(ALGO_NILM_CLOUD_FEATURE, 1);
 //    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
 //    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
 //    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 //    setArcCheckDisabled(1);
+    setDormConverterAlarmSensitivity(0, DORM_CONVERTER_SENSITIVITY_HIGH);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {
         setChargingAlarmSensitivity(channel, CHARGING_ALARM_SENSITIVITY_MEDIUM);
@@ -164,6 +168,13 @@ int algo_set_test() {
                         NULL);
 //                        feedData(dirIndex % CHANNEL_NUM, gSimulatedData, voltage, time(NULL), NULL);
                         i = 0;
+
+                        NilmCloudFeature *nilmCloudFeature = NULL;
+                        getNilmCloudFeature(0, &nilmCloudFeature); //nilmCloudFeature返回为空则没有事件需要上传
+
+                        if (nilmCloudFeature != NULL) {
+                            printf("%f\n", nilmCloudFeature->activePower);
+                        }
                     }
                     pointNum++;
                 }

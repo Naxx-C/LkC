@@ -24,6 +24,7 @@ void registerPrintf(int print(const char*, ...));
 #define ALGO_DORM_CONVERTER_DETECT 1
 #define ALGO_MALICIOUS_LOAD_DETECT 2
 #define ALGO_ARCFAULT_DETECT       3
+#define ALGO_NILM_CLOUD_FEATURE    4
 //算法子功能使能,默认全部关闭
 int setModuleEnable(int module, int enable);
 //获取对应功能返回值,返回1为报警

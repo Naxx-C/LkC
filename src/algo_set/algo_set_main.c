@@ -5,6 +5,7 @@
 #include "power_utils.h"
 #include "log_utils.h"
 #include "algo_set.h"
+#include "algo_set_internal.h"
 #include "algo_set_build.h"
 #include "algo_base_struct.h"
 #include "func_charging_alarm.h"
@@ -63,6 +64,9 @@ static int gArcfaultAlarm[CHANNEL_NUM];
 static int gFuncArcfaultEnabled = 0;
 static int gArcNum[CHANNEL_NUM], gThisPeriodNum[CHANNEL_NUM];
 
+static NilmCloudFeature gNilmCloudFeature[CHANNEL_NUM];
+static int gNilmCloudFeatureEnabled = 0;
+
 #define SHORT_TRACK_SIZE 10 // 1s采样一次，10s数据
 static PowerTrack gShortPowerTrack[CHANNEL_NUM][SHORT_TRACK_SIZE]; //存储电能足迹
 static int gShortTrackNum[CHANNEL_NUM];
@@ -92,6 +96,9 @@ int setModuleEnable(int module, int enable) {
         break;
     case ALGO_ARCFAULT_DETECT:
         gFuncArcfaultEnabled = enable;
+        break;
+    case ALGO_NILM_CLOUD_FEATURE:
+        gNilmCloudFeatureEnabled = enable;
         break;
     default:
         return -1;
@@ -124,6 +131,14 @@ int getArcfaultDetectResult(int channel, int *arcNum, int *onePeriodNum) {
     if (onePeriodNum != NULL)
         *onePeriodNum = gThisPeriodNum[channel];
     return gArcfaultAlarm[channel];
+}
+
+void getNilmCloudFeature(int channel, NilmCloudFeature **nilmCloudFeature) {
+    if (!gNilmCloudFeatureEnabled || gNilmCloudFeature[channel].deltaActivePower < LF) {
+        *nilmCloudFeature = NULL;
+        return;
+    }
+    *nilmCloudFeature = gNilmCloudFeature + channel;
 }
 
 void setMinEventDeltaPower(int channel, float minEventDeltaPower) {
@@ -342,14 +357,18 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
     }
 
     //最大跳变和最大值
-    float maxDelta = 0, maxValue = 0;
+    float maxDelta = 0, maxValue = 0, minNegDelta = 0, minNegValue = 0;
     for (int i = curStart; i < curStart + 127; i++) {
         float delta = cur[i + 1] - cur[i];
         if (delta > maxDelta) {
             maxDelta = delta;
+        } else if (delta < minNegDelta) {
+            minNegDelta = delta;
         }
         if (cur[i] > maxValue) {
             maxValue = cur[i];
+        } else if (cur[i] < minNegValue) {
+            minNegValue = cur[i];
         }
     }
 
@@ -361,6 +380,8 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
     wf->minRightNum = minRightNum;
     wf->maxDelta = maxDelta;
     wf->maxValue = maxValue;
+    wf->minNegDelta = minNegDelta;
+    wf->minNegValue = minNegValue;
     return 0;
 }
 
@@ -371,13 +392,14 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     if (cur == NULL || vol == NULL) {
         return -1;
     }
-    //报警状态复位
+    //报警状态或输出变量复位
     gChargingAlarm[channel] = 0;
     gDormConverterAlarm[channel] = 0;
     gMaliLoadAlarm[channel] = 0;
     gArcfaultAlarm[channel] = 0;
     gArcNum[channel] = 0;
     gThisPeriodNum[channel] = 0;
+    memset(gNilmCloudFeature + channel, 0, sizeof(NilmCloudFeature));
 
     DateStruct ds;
     getDateByTimestamp(unixTimestamp, &ds);
@@ -515,7 +537,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     //step:特征提取
     float deltaEffI = LF, deltaEffU = LF, iPulse = LF, deltaActivePower = LF, deltaReactivePower = LF;
     float deltaOddFft[5] = { LF, LF, LF, LF, LF }; //奇次谐波
-//    int startupTime = 0; // 启动时间
+    int startupTime = 0; // 启动时间
     int zeroCrossLast = -1, zeroCrossThis = -1; //上个周期及本个周期稳态电压穿越
     WaveFeature deltaWf;
     memset(&deltaWf, 0, sizeof(deltaWf));
@@ -539,7 +561,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         deltaReactivePower = getReactivePower(deltaActivePower, deltaEffI * deltaEffU);
 
         // feature3:
-//        startupTime = gTransitTime[channel];
+        startupTime = gTransitTime[channel];
 
         // feature4:
         iPulse = (gTransitTmpIMax[channel] - gLastStableIEff[channel]) / (effI - gLastStableIEff[channel]);
@@ -666,7 +688,22 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         }
     }
 
-    //nilm
+    //nilmCloudFeature
+    if (gNilmCloudFeatureEnabled && switchEventHappen) {
+        gNilmCloudFeature[channel].activePower = activePower;
+        gNilmCloudFeature[channel].current = effI;
+        gNilmCloudFeature[channel].voltage = effU;
+        gNilmCloudFeature[channel].deltaActivePower = deltaActivePower;
+        gNilmCloudFeature[channel].deltaCurrent = deltaEffI;
+        gNilmCloudFeature[channel].iPulse = iPulse;
+        gNilmCloudFeature[channel].startupTime = startupTime;
+        gNilmCloudFeature[channel].fft1 = deltaOddFft[0];
+        gNilmCloudFeature[channel].fft3 = deltaOddFft[1];
+        gNilmCloudFeature[channel].fft5 = deltaOddFft[2];
+        gNilmCloudFeature[channel].fft7 = deltaOddFft[3];
+        gNilmCloudFeature[channel].fft9 = deltaOddFft[4];
+        gNilmCloudFeature[channel].unixTime = unixTimestamp;
+    }
 
     //step:状态和变量更新
     // 稳态窗口的变量赋值和状态刷新
@@ -772,6 +809,8 @@ int initTpsonAlgoLib(void) {
     memset(gPowerCost, 0, sizeof(gPowerCost));
     memset(gLastPowercostUpdateTime, 0, sizeof(gLastPowercostUpdateTime));
     memset(gLastActivePower, 0, sizeof(gLastActivePower));
+
+    memset(gNilmCloudFeature, 0, sizeof(gNilmCloudFeature));
 
 //step:初始化算法模块
     initFuncArcfault();

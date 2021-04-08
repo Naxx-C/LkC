@@ -15,6 +15,8 @@ typedef struct {
     int minRightNum;
     float maxDelta;//最大正跳变
     float maxValue;//最大值
+    float minNegDelta;//负半周最大跳变
+    float minNegValue; //负半周最大值
 } WaveFeature;
 
 #pragma pack(1)

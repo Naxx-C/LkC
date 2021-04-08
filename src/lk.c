@@ -7,6 +7,8 @@
 #include "log_utils.h"
 #include "type_utils.h"
 #include "algo_set.h"
+#include "smoke_detect.h"
+#include "algo_set_internal.h"
 
 typedef struct {
     int a;
@@ -109,109 +111,82 @@ static int gTimeTriggerBuffIndex[CHANNEL_NUM] = { 0 };
 static int gLastTimeTriggerSectionTime[CHANNEL_NUM] = { 0 };
 static int gLastTimeTriggerAlarmAuditTime[CHANNEL_NUM] = { 0 };
 
-static int getSmartModeTimeTriggerTimes(int channel, int alarmAction, int unixTime) {
-    if (unixTime - gLastTimeTriggerSectionTime[channel] >= HOUR) {
-        if (gTimeTriggerBuffIndex[channel] >= ARC_TIME_TRIGGER_BUFFSIZE
-                || gTimeTriggerBuffIndex[channel] < 0) {
-            gTimeTriggerBuffIndex[channel] = 0;
-        }
-        if (alarmAction == 1) {
-            if (unixTime - gLastTimeTriggerAlarmAuditTime[channel] >= HOUR) {
-                gSmartmodeTimeTrigger[channel][gTimeTriggerBuffIndex[channel]] = 1;
-                gLastTimeTriggerAlarmAuditTime[channel] = unixTime;
-            }
-        } else {
-            gSmartmodeTimeTrigger[channel][gTimeTriggerBuffIndex[channel]] = 0;
-        }
-
-        gTimeTriggerBuffIndex[channel]++;
-        gLastTimeTriggerSectionTime[channel] = unixTime; //上一次处理记录时间
-    } else if (alarmAction == 1) {
-        int lastIndex = gTimeTriggerBuffIndex[channel] - 1;
-        if (lastIndex < 0) {
-            lastIndex = ARC_TIME_TRIGGER_BUFFSIZE - 1;
-        }
-        if (gSmartmodeTimeTrigger[channel][lastIndex]
-                == 0&& unixTime-gLastTimeTriggerAlarmAuditTime[channel]>=HOUR) {
-            gSmartmodeTimeTrigger[channel][lastIndex] = 1;
-            gLastTimeTriggerAlarmAuditTime[channel] = unixTime;
-        }
-    }
-
-    int smartmodeTimeTrigger = 0;
-    for (int i = 0; i < ARC_TIME_TRIGGER_BUFFSIZE; i++) {
-        smartmodeTimeTrigger += gSmartmodeTimeTrigger[channel][i];
-    }
-
-    return smartmodeTimeTrigger;
-}
-
 // 针对进烟速度的惩罚
 static float speedPulish(float data, float base) {
 
 //    return data;
-    int pulishR = 20;
+    int pulishR = -500;
     return (base + (data - base) * (float) pulishR / 100);
+}
+
+static float gFrontRedBase = 0, gFrontRedAlarmThresh = 20;
+
+static void updateFrontRedBaseValue(U16 frontRed) {
+
+    if (gFrontRedBase == 0) { //首次运行
+        gFrontRedBase = frontRed;
+    } else {
+        //异常过滤，如处于进烟状态
+        //TODO:由于整除的精度问题，有可能永远不生效. (10, gFrontRedAlarmThresh / 2]之间的变化才能生效
+        if (frontRed - gFrontRedBase < gFrontRedAlarmThresh / 2) {
+            gFrontRedBase = (frontRed * 0.1 + gFrontRedBase * 99.9) / 100;
+        }
+    }
+
+    if (outprintf != NULL)
+        outprintf("%d: %f\n", frontRed, gFrontRedBase);
 }
 
 #define SIZE 100
 #define  N 100
 
+static NilmCloudFeature gNilmCloudFeature[3];
+static void getNilmFeature2(int channel, NilmCloudFeature **nilmFeature) {
+
+    *nilmFeature = gNilmCloudFeature+channel;//[channel];
+    printf("%p\n",*nilmFeature);
+}
 int main() {
 
+    registerPrintf(printf);
     printf("start\n");
 
-    float alarmThresh = 30;
-    float a02[N] = { 0 }, a10[N] = { 0 }, c02[N] = { 0 }, c10[N] = { 0 };
-
-    int alarmTime11 = 0, alarmTime12 = 0, alarmTime21 = 0, alarmTime22 = 0;
-    for (int i = 0; i < N; i++) {
-        a02[i] = i;
-        a10[i] = 1.6 * i;
-
-        if (a02[i] >= alarmThresh && alarmTime11 == 0)
-            alarmTime11 = i;
-        if (a10[i] >= alarmThresh && alarmTime12 == 0)
-            alarmTime12 = i;
-
-        if (i >= 6) {
-            c02[i] = speedPulish(a02[i], a02[i - 6]);
-            c10[i] = speedPulish(a10[i], a10[i - 6]);
-        }
-
-        if (c02[i] >= alarmThresh && alarmTime21 == 0)
-            alarmTime21 = i;
-        if (c10[i] >= alarmThresh && alarmTime22 == 0)
-            alarmTime22 = i;
-    }
-    printf("%d %d %d %d  ratio=%.1f vs %.1f\n", alarmTime11, alarmTime12, alarmTime21, alarmTime22,
-            (float) alarmTime11 / alarmTime12, (float) alarmTime21 / alarmTime22);
-
-//    1.0 vs 1.4
-
-//    int alarmAction[SIZE] = {//
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 1, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 1, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 1, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 1, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-//            };
-//    for (int i = 0; i < SIZE; i++) {
-//        int smartmodeTimeTrigger = getSmartModeTimeTriggerTimes(0, alarmAction[i % SIZE], 100 + i);
-//        printf("%d: %d\n", i + 1, smartmodeTimeTrigger);
+//    for (int i = 0; i < 500; i++) {
+//        U16 frontRed = i;
+//        if (frontRed > 10)
+//            frontRed = 10;
+//        updateFrontRedBaseValue(frontRed);
 //    }
 
-    //24小时内触发4次以上
-    registerPrintf(printf);
+    smoke_detect_test();
+
+    //    float alarmThresh = 30;
+//    float a02[N] = { 0 }, a10[N] = { 0 }, c02[N] = { 0 }, c10[N] = { 0 };
+//
+//    int alarmTime11 = 0, alarmTime12 = 0, alarmTime21 = 0, alarmTime22 = 0;
+//    for (int i = 0; i < N; i++) {
+//        a02[i] = i;
+//        a10[i] = 1.6 * i;
+//
+//        if (a02[i] >= alarmThresh && alarmTime11 == 0)
+//            alarmTime11 = i;
+//        if (a10[i] >= alarmThresh && alarmTime12 == 0)
+//            alarmTime12 = i;
+//
+//        if (i >= 6) {
+//            c02[i] = speedPulish(a02[i], a02[i - 6]);
+//            c10[i] = speedPulish(a10[i], a10[i - 6]);
+//        }
+//
+//        if (c02[i] >= alarmThresh && alarmTime21 == 0)
+//            alarmTime21 = i;
+//        if (c10[i] >= alarmThresh && alarmTime22 == 0)
+//            alarmTime22 = i;
+//    }
+//    printf("%d %d %d %d  ratio=%.1f vs %.1f\n", alarmTime11, alarmTime12, alarmTime21, alarmTime22,
+//            (float) alarmTime11 / alarmTime12, (float) alarmTime21 / alarmTime22);
+
+//    1.0 vs 1.4
 
 //    algo_set_test();
 

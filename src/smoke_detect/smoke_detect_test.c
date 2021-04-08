@@ -1,34 +1,17 @@
 #include "file_utils.h"
 #include "string_utils.h"
-#include "algo_set_build.h"
-#include "func_arcfault.h"
 #include "time_utils.h"
-#include "algo_set.h"
 #include <stdio.h>
 #include <sys/stat.h>
+#include "smoke_detect.h"
 #include "dirent.h"
 #include <string.h>
 #include <time.h>
 #include <math.h>
 #include <unistd.h>
-#include "fft.h"
-#ifdef _WIN32
-#endif
 
-static char gDirs[][100] = {
-//        "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charginglk2",
-//        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
-//        "F:\\Tmp\\maliload_dianchuifenglk2", "F:\\Tmp\\maliload_reshuiqilk2",
-//        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
-//        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
-//        "F:\\Tmp\\charging_medium_lowratelk2",
-//        "F:\\Tmp\\arcfault_falsealarm\\diantaolu",
-//        "F:\\data\\ArcfaultData\\category\\RealAlarm\\hairdryer",
-//        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\diancilu",
-        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\tiaoyaqi",
-//        "F:\\data\\DormConverter\\category\\FalseAlarm\\diantaolu",
-//        "F:\\data\\DormConverter\\category\\RealAlarm",
-        };
+
+static char gDirs[][100] = { "F:\\data\\smoke" };
 
 static int init() {
     return 0;
@@ -78,7 +61,6 @@ int smoke_detect_test() {
 //        char *dir = (char*) (gDirs + i);
 //        printf("%s\n", dir);
 //    }
-//    return 0;
 
     for (int dirIndex = 0; dirIndex < sizeof(gDirs) / 100; dirIndex++) {
         char *dirPath = (char*) (gDirs + dirIndex);
@@ -89,8 +71,6 @@ int smoke_detect_test() {
         DIR *dir = NULL;
         struct dirent *entry;
 
-        int timeGap = 0;
-        int pointNum = 0, fileIndex = 0;
         if ((dir = opendir(dirPath)) == NULL) {
             printf("opendir failed\n");
         } else {
@@ -99,37 +79,23 @@ int smoke_detect_test() {
                 if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0
                         || !endWith(entry->d_name, ".csv")) //016152951
                     continue;
-//                initTpsonAlgoLib();
 //                init();
-                int convertHardcode = 1;
-                if (startWith(entry->d_name, "elec_"))
-                    convertHardcode = 1; //TODO:2020.11月之前的，单相电抓的数据是反的,需要-1
 
-                fileIndex = 0;
                 memset(csv, 0, sizeof(csv));
                 snprintf(csv, sizeof(csv) - 1, "%s\\%s", dirPath, entry->d_name);
                 printf("filepath=%s filetype=%d\n", csv, entry->d_type); //输出文件或者目录的名称
                 /**parse csv*/
-                float current[128], voltage[128];
                 FILE *f = fopen(csv, "rb");
                 printf("%s\n", csv);
-//            FILE *f = fopen(csvPath, "rb");
                 int i = 0;
                 while (!feof(f) && !ferror(f)) {
-                    float cur, vol;
-                    fscanf(f, "%f,%f", &cur, &vol);
-                    current[i] = cur * convertHardcode;
-                    voltage[i] = vol;
-                    fileIndex++;
+                    SAMPLE_VALUE sampleValue;
+                    sampleValue.backgroundValue = 20;
+                    fscanf(f, "%d,%d", &(sampleValue.frontRed), &(sampleValue.frontBlue));
                     i++;
-                    if (i >= 128) {
-                        setMaxChargingDevicePower(0, 5000);
-                        feedData(dirIndex % CHANNEL_NUM, current, voltage, time(NULL) + (timeGap++) * 360,
-                        NULL);
-//                        feedData(dirIndex % CHANNEL_NUM, gSimulatedData, voltage, time(NULL), NULL);
-                        i = 0;
-                    }
-                    pointNum++;
+                    SMOKE_DETECT_RESULT smokeDetectResult;
+                    memset(&smokeDetectResult, 0, sizeof(smokeDetectResult));
+                    char needAlarm = smoke_detect(&smokeDetectResult, sampleValue, i += 10);
                 }
                 fclose(f);
             }

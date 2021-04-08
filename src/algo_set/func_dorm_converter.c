@@ -55,7 +55,7 @@ int dormConverterAdjustingCheck(int channel, float activePower, float reactivePo
     case DORM_CONVERTER_SENSITIVITY_HIGH: //高灵敏度
         minExtreme = 2;
         maxExtreme = 4;
-        minFlat = 12;
+        minFlat = 10;
         minActivePower = 120;
         minReactivePower = 120;
         minDeltaRatio = 0.8f;
@@ -110,7 +110,7 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
     case DORM_CONVERTER_SENSITIVITY_HIGH: //高灵敏度
         minExtreme = 2;
         maxExtreme = 4;
-        minFlat = 10;
+        minFlat = 8;
         minActivePower = 100;
         minReactivePower = 50;
         minDeltaRatio = 0.8f;
@@ -157,7 +157,7 @@ int dormConverterDetect(int channel, float deltaActivePower, float deltaReactive
     }
 
     //排除充电干扰. 斩波会从平肩直接跳变到最大值，充电会有个上升过程
-    if (wf->maxDelta < wf->maxValue * minDeltaRatio) {
+    if (wf->maxDelta < wf->maxValue * minDeltaRatio && wf->minNegDelta > wf->minNegValue * minDeltaRatio) {
         if (errMsg != NULL) {
             sprintf(errMsg, "mad=%.2f mav=%.2f", wf->maxDelta, wf->maxValue);
         }

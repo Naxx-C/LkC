@@ -8,7 +8,7 @@
 #define CHANNEL_NUM 4
 #define DEBUG_ONLY 0
 //#define ARM_MATH_CM4
-#define LOG_ON 0
+#define LOG_ON 1
 #define OUTLOG_ON 1//对外输出的打印
 #define TMP_DEBUG 0
 
