@@ -8,7 +8,7 @@
 void setMaliLoadAlarmSensitivity(int channel, int mode);
 int getMaliLoadAlarmSensitivity(int channel);
 int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActivePower,
-        float deltaReactivePower, float effU, float activePower, float reactivePower, WaveFeature *deltaWf,
-        DateStruct *date, char *errMsg);
+        float deltaReactivePower, float effU, float activePower, float reactivePower, float voltageAberrRate,
+        WaveFeature *deltaWf, DateStruct *date, char *errMsg);
 int initFuncMaliLoad(void);
 #endif

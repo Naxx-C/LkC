@@ -187,8 +187,7 @@ int main() {
 //            (float) alarmTime11 / alarmTime12, (float) alarmTime21 / alarmTime22);
 
 //    1.0 vs 1.4
-
-//    algo_set_test();
+    algo_set_test();
 
     printf("done\n");
     return 0;

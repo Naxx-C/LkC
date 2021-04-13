@@ -65,7 +65,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
     switch (gSensitivity[channel]) {
     case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
         pulseIThresh = 2.0f; //越大越严
-        thetaThresh = 10; //越小越严
+        thetaThresh = 9; //越小越严
         maxExtreme = 2; //越小越严
         minFlat = 18; //越大越严
         minActivePower = 100; //越大越严
@@ -74,7 +74,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         break;
     case CHARGING_ALARM_SENSITIVITY_MEDIUM:
         pulseIThresh = 1.0f;
-        thetaThresh = 13;
+        thetaThresh = 10.5;
         maxExtreme = 4;
         minFlat = 16;
         minActivePower = 90;
@@ -83,7 +83,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         break;
     case CHARGING_ALARM_SENSITIVITY_HIGH: //高灵敏度
         pulseIThresh = 0.0f;
-        thetaThresh = 15;
+        thetaThresh = 13;
         maxExtreme = 7;
         minFlat = 13;
         minActivePower = 80;
@@ -112,7 +112,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
 #ifdef TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("da=%.0f pi=%.1f fr=%.2f f1=%.2f f3=%.2f", deltaActivePower, pulseI,
+            outprintf("da=%.0f pi=%.1f fr=%.2f f1=%.2f f3=%.2f\n", deltaActivePower, pulseI,
                     (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f), fft[0], fft[1]);
         }
 #endif
@@ -141,12 +141,10 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         }
     }
     if (minTheta > thetaThresh) {
-#ifdef TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("th=%.1f", minTheta);
         }
-#endif
 #endif
         return 0;
     }
@@ -236,4 +234,3 @@ int similarityTest(void) {
 #endif
     return 0;
 }
-

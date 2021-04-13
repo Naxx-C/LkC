@@ -36,7 +36,13 @@ static char gDirs[][100] = {
 //        "F:\\data\\DormConverter\\category\\FalseAlarm\\diantaolu",
 //        "F:\\data\\DormConverter\\category\\RealAlarm",
 //        "F:\\data\\DormConverter\\category\\MissAlarm",
-        "F:\\data\\ChargingAlarm\\category\\FalseAlarm" };
+//        "F:\\data\\ChargingAlarm\\category\\FalseAlarm"
+        "F:\\data\\DormConverter\\category\\FalseAlarm\\arcfault"
+//          "F:\\Tmp\\0412dianbingxiangwubao"
+//        "F:\\data\\DormConverter\\category\\FalseAlarm\\false_to_chongdianqi"
+//        "F:\\Tmp\\maliload_yinshuiji"
+//        "F:\\Tmp\\chuifengji"
+        };
 
 static int init() {
 
@@ -46,18 +52,21 @@ static int init() {
     }
 
 //    setModuleEnable(ALGO_CHARGING_DETECT, 1);
-    setModuleEnable(ALGO_NILM_CLOUD_FEATURE, 1);
-//    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+//    setChargingAlarmSensitivity(0, CHARGING_ALARM_SENSITIVITY_HIGH);
+    setMinEventDeltaPower(0, 30);
+    setMinChargingDevicePower(0, 30);
+//    setModuleEnable(ALGO_NILM_CLOUD_FEATURE, 1);
+    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
 //    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
 //    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 //    setArcCheckDisabled(1);
-    setDormConverterAlarmSensitivity(0, DORM_CONVERTER_SENSITIVITY_HIGH);
+//    setDormConverterAlarmSensitivity(0, DORM_CONVERTER_SENSITIVITY_HIGH);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {
-        setChargingAlarmSensitivity(channel, CHARGING_ALARM_SENSITIVITY_MEDIUM);
+//        setChargingAlarmSensitivity(channel, CHARGING_ALARM_SENSITIVITY_MEDIUM);
 //        setMaliLoadAlarmSensitivity(channel, MALI_LOAD_SENSITIVITY_HIGH);
-        setMinEventDeltaPower(channel, 55);
-        setMinChargingDevicePower(channel, 55);
+//        setMinEventDeltaPower(channel, 55);
+//        setMinChargingDevicePower(channel, 55);
     }
 //    addMaliciousLoadWhitelist(0, 1000);
 //    setMaliLoadWhitelistMatchRatio(0, 0.7, 1.3);

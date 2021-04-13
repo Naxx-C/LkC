@@ -129,8 +129,8 @@ static int isInMaliciousLoadWhitelist(int channel, float power) {
 }
 
 int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActivePower,
-        float deltaReactivePower, float effU, float activePower, float reactivePower, WaveFeature *deltaWf,
-        DateStruct *date, char *errMsg) {
+        float deltaReactivePower, float effU, float activePower, float reactivePower, float voltageAberrRate,
+        WaveFeature *deltaWf, DateStruct *date, char *errMsg) {
 
     if (deltaActivePower < 0)
         return 0;
@@ -142,23 +142,23 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
         minPf = 0.985f; //越大越严
         minFlatNum = 15; //越大越严
         maxPulseI = 1.04f; //越小越严
-        minFft1d3 = 20; //越大越严
+        minFft1d3 = 26; //越大越严
         maxHarmRatio = 0.1f; //越小越严
         minAcReactivePower = 250; //越大越严
         break;
     case MALI_LOAD_SENSITIVITY_MEDIUM:
-        minPf = 0.97f;
+        minPf = 0.975f;
         minFlatNum = 14;
         maxPulseI = 1.09f;
-        minFft1d3 = 17.0f;
+        minFft1d3 = 21.0f;
         maxHarmRatio = 0.12f;
         minAcReactivePower = 205;
         break;
     case MALI_LOAD_SENSITIVITY_HIGH: //高灵敏度
-        minPf = 0.95f;
+        minPf = 0.96f;
         minFlatNum = 13;
         maxPulseI = 1.12f;
-        minFft1d3 = 13;
+        minFft1d3 = 19;
         maxHarmRatio = 0.13f;
         minAcReactivePower = 190;
         break;
@@ -167,11 +167,15 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
         break;
     }
 
+    //电压畸变率修正
+    minFft1d3 -= voltageAberrRate;
+    if (minFft1d3 > 20)
+        minFft1d3 = 20;
+    if (minFft1d3 < 10)
+        minFft1d3 = 10;
+
     float stActivePower = getStandardPower(deltaActivePower, effU);
     if (stActivePower < gMinPower[channel]) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "pc:%.2f %.2f", deltaActivePower, effU);
-        }
 #if TUOQIANG_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
@@ -183,30 +187,20 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     }
 
     if (isInMaliciousLoadWhitelist(channel, stActivePower)) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "wl:%.2f", stActivePower);
-        }
-#if TUOQIANG_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("wl:%.2f\r\n", stActivePower);
         }
-#endif
 #endif
         return 0;
     }
 
 //半波设备
     if (deltaWf->extremeNum == 1 && deltaWf->flatNum >= minFlatNum) {
-        if (errMsg != NULL) {
-            sprintf(errMsg, "hfd: %d %d", deltaWf->extremeNum, deltaWf->flatNum);
-        }
-#if TUOQIANG_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("hfd: %d %d\r\n", deltaWf->extremeNum, deltaWf->flatNum);
         }
-#endif
 #endif
         return 2;
     }
@@ -214,15 +208,15 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     float powerFactor = deltaActivePower
             / (sqrt(deltaActivePower * deltaActivePower + deltaReactivePower * deltaReactivePower));
     int isHeatingDevice = 0;
-    if (powerFactor >= minPf && pulseI < maxPulseI && fft[0] / (fft[1] + LF) >= minFft1d3) {
+    if (powerFactor >= minPf && pulseI < maxPulseI && fft[0] / (fft[1] + LF) >= minFft1d3
+            && deltaWf->flatNum == 0 && deltaWf->extremeNum <= 4) {
         isHeatingDevice = 1;
     } else {
-#if TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("pf:%.2f pi:%.2f f:%.1f\r\n", powerFactor, pulseI, fft[0] / (fft[1] + LF));
+            outprintf("pf:%.2f pi:%.2f f:%.1f va=%.1f\r\n", powerFactor, pulseI, fft[0] / (fft[1] + LF),
+                    voltageAberrRate);
         }
-#endif
 #endif
     }
 

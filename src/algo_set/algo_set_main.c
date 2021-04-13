@@ -241,6 +241,44 @@ static void getOddFft(float *cur, int curStart, float oddFft[5]) {
 #endif
 }
 
+static float getAberrationRate(float *cur, int curStart) {
+#ifdef ARM_MATH_CM4
+    arm_cfft_radix2_instance_f32 S;
+    int ifftFlag = 0;
+    float *in = cur + curStart;
+    memset(gArmFftinput, 0, sizeof(gArmFftinput));
+    for (int i = 0; i < 128; i++) {
+        gArmFftinput[2 * i] = in[i];
+    }
+    arm_cfft_radix2_init_f32(&S, 128, ifftFlag, 1);
+    arm_cfft_radix2_f32(&S, gArmFftinput);
+    arm_cmplx_mag_f32(gArmFftinput, gFft, 128);
+
+    float squareSum = 0;
+    for (int j = 2; j < 10; j++) {
+        squareSum += (gFft[j] / 64) * (gFft[j] / 64);
+    }
+    squareSum = squareSum / (gFft[1] / 64) / (gFft[1] / 64);
+    return sqrt(squareSum) * 100;
+//    for (int j = 0; j < 5; j++) {
+//        oddFft[j] = gFft[j * 2 + 1] / 64;
+//    }
+
+#else
+    do_fft(cur + curStart, gFft);
+
+//    for (int j = 0; j < 5; j++) {
+//        oddFft[j] = gFft[j * 2 + 1];
+//    }
+    float squareSum = 0;
+    for (int j = 2; j < 10; j++) { //取10次约等于31次的,减少计算量
+        squareSum += gFft[j] * gFft[j];
+    }
+    squareSum = squareSum / (gFft[1] * gFft[1]);
+    return sqrt(squareSum) * 100;
+#endif
+}
+
 //电流波形分析
 #define BATCH 4
 static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volStart, float effI, float effU,
@@ -539,6 +577,18 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     float deltaOddFft[5] = { LF, LF, LF, LF, LF }; //奇次谐波
     int startupTime = 0; // 启动时间
     int zeroCrossLast = -1, zeroCrossThis = -1; //上个周期及本个周期稳态电压穿越
+
+    static float voltageAberrRate = 0;
+    if (gFuncMaliciousLoadEnabled && gTimer[channel] % 90000 == 10) { //每半小时更新一次电压畸变率，节省性能
+        voltageAberrRate = getAberrationRate(vol, 0);
+        if (voltageAberrRate > 9)
+            voltageAberrRate = 9;
+#if OUTLOG_ON
+        if (outprintf != NULL) {
+            outprintf("var=%.1f\r\n", voltageAberrRate);
+        }
+#endif
+    }
     WaveFeature deltaWf;
     memset(&deltaWf, 0, sizeof(deltaWf));
     if (switchEventHappen) {
@@ -648,7 +698,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 
         char msg[50] = { 0 };
         gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, deltaActivePower,
-                deltaReactivePower, effU, activePower, reactivePower, &deltaWf, &ds, msg);
+                deltaReactivePower, effU, activePower, reactivePower, voltageAberrRate, &deltaWf, &ds, msg);
 #if TUOQIANG_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
