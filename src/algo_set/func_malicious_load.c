@@ -31,6 +31,11 @@ static float gPowerMaxRatio[CHANNEL_NUM];
 void setMaliLoadWhitelistMatchRatio(int channel, float minRatio, float maxRatio) {
     gPowerMinRatio[channel] = minRatio;
     gPowerMaxRatio[channel] = maxRatio;
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("[%d]add matchRatio [%.1f-%.1f] \r\n", channel, minRatio, maxRatio);
+    }
+#endif
 }
 
 static float gMinPower[CHANNEL_NUM];
@@ -62,6 +67,11 @@ void addMaliciousLoadWhitelist(int channel, float power) {
     }
 
     insertFloatToBuff(gPowerWhitelist[channel], POWER_WHITELIST_SIZE, power);
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("[%d]add %.1f to whitelist \r\n", channel, power);
+    }
+#endif
     if (gPowerWhitelistNum[channel] < POWER_WHITELIST_SIZE) {
         gPowerWhitelistNum[channel]++;
     }
@@ -136,12 +146,12 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
         return 0;
 
     int minFlatNum = 15;
-    float minPf = 0.97f, maxPulseI = 1.09f, minFft1d3 = 18, maxHarmRatio = 0.1f, minAcReactivePower = 200;
+    float minPf = 0.97f, maxPulseI = 1.08f, minFft1d3 = 18, maxHarmRatio = 0.1f, minAcReactivePower = 200;
     switch (gSensitivity[channel]) {
     case MALI_LOAD_SENSITIVITY_LOW: //低灵敏度
         minPf = 0.985f; //越大越严
         minFlatNum = 15; //越大越严
-        maxPulseI = 1.04f; //越小越严
+        maxPulseI = 1.03f; //越小越严
         minFft1d3 = 26; //越大越严
         maxHarmRatio = 0.1f; //越小越严
         minAcReactivePower = 250; //越大越严
@@ -149,7 +159,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     case MALI_LOAD_SENSITIVITY_MEDIUM:
         minPf = 0.975f;
         minFlatNum = 14;
-        maxPulseI = 1.09f;
+        maxPulseI = 1.08f;
         minFft1d3 = 21.0f;
         maxHarmRatio = 0.12f;
         minAcReactivePower = 205;
@@ -157,7 +167,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     case MALI_LOAD_SENSITIVITY_HIGH: //高灵敏度
         minPf = 0.96f;
         minFlatNum = 13;
-        maxPulseI = 1.12f;
+        maxPulseI = 1.13f;
         minFft1d3 = 19;
         maxHarmRatio = 0.13f;
         minAcReactivePower = 190;

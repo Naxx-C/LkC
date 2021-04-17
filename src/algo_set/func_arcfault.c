@@ -716,6 +716,15 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
     if (outThisPeriodNum != NULL)
         *outThisPeriodNum = arcNumThisPeriod;
 
+#if LOG_ON
+    static int lastArcNum1S[CHANNEL_NUM] = {0};
+    if (arcNum1S != lastArcNum1S[channel] && arcNum1S > 0) {
+        printf("arcNum1S=%d last=%d this=%d timer=%d\n", arcNum1S, lastArcNum1S[channel], arcNumThisPeriod,
+                gTimer[channel]);
+    }
+    lastArcNum1S[channel] = arcNum1S;
+#endif
+
     // 检测到电弧14个->进入待确认状态->在待确认期间发现不符合条件直接进入免疫->切出稳态后再继续进入正常检测期
     int fluctCheckEnd = gMoreInfoIndex[channel], fluctCheckLen = MOREINFO_BUFF_NUM;
     int alarmAction = ARCFAULT_ACTION_NONE;
@@ -730,12 +739,8 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                     || (gFftEnabled && getLastestFluctuation(gHarmonicBuff[channel],
                     MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
                 gStatus[channel] = STATUS_IMMUNE;
-#if TMP_DEBUG
-#if OUTLOG_ON
-                if (outprintf != NULL) {
-                    outprintf("immune1 dr=%d h2n=%d ms=%d\r\n", dutyRatio, have2Number, maxSeries);
-                }
-#endif
+#if LOG_ON
+            printf("arc [STATUS_NORMAL] to [STATUS_IMMUNE] timer=%d\n",gTimer[channel]);
 #endif
                 break;
             }
@@ -754,6 +759,9 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
             gWatingTime[channel] = gTimer[channel];
             gStatus[channel] = STATUS_WAITING_CHECK;
             gArcNumAlarming[channel] = arcNum1S; // 记录当前电弧数目，留做报警时传递
+#if LOG_ON
+            printf("arc [STATUS_NORMAL] to [STATUS_WAITING_CHECK] timer=%d\n",gTimer[channel]);
+#endif
         }
         break;
     case STATUS_WAITING_CHECK:
@@ -773,12 +781,8 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                         && getLastestFluctuation(gHarmonicBuff[channel],
                         MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
             gStatus[channel] = STATUS_IMMUNE;
-#if TMP_DEBUG
-#if OUTLOG_ON
-            if (outprintf != NULL) {
-                outprintf("immune2 dr=%d h2n=%d ms=%d\r\n", dutyRatio, have2Number, maxSeries);
-            }
-#endif
+#if LOG_ON
+            printf("arc [STATUS_WAITING_CHECK] to [STATUS_IMMUNE] timer=%d\n",gTimer[channel]);
 #endif
             break;
         }
@@ -789,6 +793,9 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
         MOREINFO_BUFF_NUM, 0.2f) > 5 || (gFftEnabled && getLastestFluctuation(gHarmonicBuff[channel],
         MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) > 10)) {
             gStatus[channel] = STATUS_NORMAL;
+#if LOG_ON
+            printf("arc [STATUS_IMMUNE] to [STATUS_NORMAL] timer=%d\n",gTimer[channel]);
+#endif
         }
         break;
     }
@@ -804,7 +811,8 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
         if (alarmAction == ARCFAULT_ACTION_ALARM) {
             int smartmodeAlarmAction = alarmAction;
             if (gSmartmodeLearningTime[channel] > 0) {
-                smartmodeAlarmAction = ArcStudyAnalysis(channel, 1);
+                ArcStudyAnalysis(channel, 1);
+                smartmodeAlarmAction = 0;
             } else {
                 smartmodeAlarmAction = ArcStudyAnalysis(channel, 0);
             }
@@ -993,7 +1001,7 @@ void startArcLearning(int channel) {
         return;
 #if OUTLOG_ON
     if (outprintf != NULL) {
-        outprintf("start arclearning %d\r\n", gSmartmodeLearningTimeSet[channel]);
+        outprintf("start arclearning[%d] %d\r\n", channel, gSmartmodeLearningTimeSet[channel]);
     }
 #endif
     gSmartmodeLearningTime[channel] = gSmartmodeLearningTimeSet[channel];
@@ -1004,7 +1012,7 @@ void startArcLearningWithTime(int channel, int time) {
         return;
 #if OUTLOG_ON
     if (outprintf != NULL) {
-        outprintf("start arclearning %d\r\n", time);
+        outprintf("start arclearning[%d] %d\r\n", channel, time);
     }
 #endif
     gSmartmodeLearningTime[channel] = time;
@@ -1012,6 +1020,11 @@ void startArcLearningWithTime(int channel, int time) {
 
 void stopArcLearning(int channel) {
     gSmartmodeLearningTime[channel] = 0;
+#if OUTLOG_ON
+    if (outprintf != NULL) {
+        outprintf("stop arclearning[%d]\r\n", channel);
+    }
+#endif
 }
 
 void clearArcLearningResult(void) {

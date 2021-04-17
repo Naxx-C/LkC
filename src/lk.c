@@ -143,13 +143,15 @@ static void updateFrontRedBaseValue(U16 frontRed) {
 static NilmCloudFeature gNilmCloudFeature[3];
 static void getNilmFeature2(int channel, NilmCloudFeature **nilmFeature) {
 
-    *nilmFeature = gNilmCloudFeature+channel;//[channel];
-    printf("%p\n",*nilmFeature);
+    *nilmFeature = gNilmCloudFeature + channel; //[channel];
+    printf("%p\n", *nilmFeature);
 }
 int main() {
 
     registerPrintf(printf);
     printf("start\n");
+
+    setMaliLoadWhitelistMatchRatio(0,0.8,1.2);
 
 //    for (int i = 0; i < 500; i++) {
 //        U16 frontRed = i;

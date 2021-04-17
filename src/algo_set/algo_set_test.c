@@ -37,11 +37,12 @@ static char gDirs[][100] = {
 //        "F:\\data\\DormConverter\\category\\RealAlarm",
 //        "F:\\data\\DormConverter\\category\\MissAlarm",
 //        "F:\\data\\ChargingAlarm\\category\\FalseAlarm"
-        "F:\\data\\DormConverter\\category\\FalseAlarm\\arcfault"
+//        "F:\\data\\DormConverter\\category\\FalseAlarm\\arcfault"
 //          "F:\\Tmp\\0412dianbingxiangwubao"
 //        "F:\\data\\DormConverter\\category\\FalseAlarm\\false_to_chongdianqi"
 //        "F:\\Tmp\\maliload_yinshuiji"
 //        "F:\\Tmp\\chuifengji"
+        "F:\\data\\maliload\\FalseAlarm\\xiyiji_false_to_mali"
         };
 
 static int init() {
@@ -56,10 +57,10 @@ static int init() {
     setMinEventDeltaPower(0, 30);
     setMinChargingDevicePower(0, 30);
 //    setModuleEnable(ALGO_NILM_CLOUD_FEATURE, 1);
-    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
-//    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
+//    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
 //    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
-//    setArcCheckDisabled(1);
+//    setArcfaultSensitivity(0, ARCFAULT_SENSITIVITY_MEDIUM);
 //    setDormConverterAlarmSensitivity(0, DORM_CONVERTER_SENSITIVITY_HIGH);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {

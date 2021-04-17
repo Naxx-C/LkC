@@ -54,7 +54,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="dorm_converter_lib|c|arcfault_lib|charging_alarm_lib|nilm|shortcircuit_lib|nilm_lib" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+						<entry excluding="algo_set/nilm|dorm_converter_lib|c|arcfault_lib|charging_alarm_lib|nilm|shortcircuit_lib|nilm_lib" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -99,7 +99,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="c|arcfault_lib|shortcircuit_lib|nilm_lib" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+						<entry excluding="algo_set/nilm|c|arcfault_lib|shortcircuit_lib|nilm_lib" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
