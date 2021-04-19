@@ -38,10 +38,12 @@ static char gDirs[][100] = {
 //        "F:\\data\\DormConverter\\category\\MissAlarm",
 //        "F:\\data\\ChargingAlarm\\category\\FalseAlarm"
 //        "F:\\data\\DormConverter\\category\\FalseAlarm\\arcfault"
-//          "F:\\Tmp\\0412dianbingxiangwubao"
-//        "F:\\data\\DormConverter\\category\\FalseAlarm\\false_to_chongdianqi"
+//          "F:\\Tmp\\0412dianbingxiangwubao",
+//        "F:\\data\\DormConverter\\category\\FalseAlarm\\false_to_chongdianqi",
 //        "F:\\Tmp\\maliload_yinshuiji"
 //        "F:\\Tmp\\chuifengji"
+//        "F:\\data\\maliload\\MissAlarm",
+//        "F:\\data\\maliload\\MissAlarm\\jibian",
         "F:\\data\\maliload\\FalseAlarm\\xiyiji_false_to_mali"
         };
 
@@ -54,10 +56,10 @@ static int init() {
 
 //    setModuleEnable(ALGO_CHARGING_DETECT, 1);
 //    setChargingAlarmSensitivity(0, CHARGING_ALARM_SENSITIVITY_HIGH);
-    setMinEventDeltaPower(0, 30);
+//    setMinEventDeltaPower(0, 30);
     setMinChargingDevicePower(0, 30);
 //    setModuleEnable(ALGO_NILM_CLOUD_FEATURE, 1);
-//    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
     setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
 //    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 //    setArcfaultSensitivity(0, ARCFAULT_SENSITIVITY_MEDIUM);

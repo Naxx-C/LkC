@@ -29,6 +29,7 @@ int fft_main(void) {
     fft(x, SAMPLE_NODES);
 
 #if FFT_LOG_ON == 1
+    int i = 0;
     printf("\nfft\n");
     for (i = 0; i < SAMPLE_NODES; i++) {
         printf("%.5f %.5f %.5f\n", x[i].real, x[i].imag,

@@ -138,7 +138,7 @@ static int isInMaliciousLoadWhitelist(int channel, float power) {
     return 0;
 }
 
-int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActivePower,
+int maliciousLoadDetect(int channel, float *fft, float pulseI, float curSamplePulse, float deltaActivePower,
         float deltaReactivePower, float effU, float activePower, float reactivePower, float voltageAberrRate,
         WaveFeature *deltaWf, DateStruct *date, char *errMsg) {
 
@@ -176,6 +176,10 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     default:
         break;
     }
+
+    //step: 附加处理
+    //脉冲
+    float maxCurSamplePulse = maxPulseI * 1.05f;//多百分之5
 
     //电压畸变率修正
     minFft1d3 -= voltageAberrRate;
@@ -218,8 +222,8 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActive
     float powerFactor = deltaActivePower
             / (sqrt(deltaActivePower * deltaActivePower + deltaReactivePower * deltaReactivePower));
     int isHeatingDevice = 0;
-    if (powerFactor >= minPf && pulseI < maxPulseI && fft[0] / (fft[1] + LF) >= minFft1d3
-            && deltaWf->flatNum == 0 && deltaWf->extremeNum <= 4) {
+    if (powerFactor >= minPf && pulseI < maxPulseI && curSamplePulse < maxCurSamplePulse
+            && fft[0] / (fft[1] + LF) >= minFft1d3 && deltaWf->flatNum == 0 && deltaWf->extremeNum <= 4) {
         isHeatingDevice = 1;
     } else {
 #if OUTLOG_ON

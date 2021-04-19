@@ -1,5 +1,6 @@
 #include "func_dorm_converter.h"
 #include "algo_base_struct.h"
+#include "log_utils.h"
 #include "algo_set_build.h"
 #include <string.h>
 #include <stdio.h>

@@ -146,12 +146,84 @@ static void getNilmFeature2(int channel, NilmCloudFeature **nilmFeature) {
     *nilmFeature = gNilmCloudFeature + channel; //[channel];
     printf("%p\n", *nilmFeature);
 }
+
+static float f419[128] = { 0, 0.14648438, 0, 0.14648438, 0, 0, 0.07324219, 0.14648438, 0.07324219, 0.07324219,
+        0.07324219, 0.07324219, 0.14648438, 0.14648438, 0.36621094, 0.6591797, 0.7324219, 0.6591797,
+        1.0253906, 1.2451172, 1.3916016, 1.6113281, 1.9042969, 2.0507812, 2.2705078, 2.5634766, 2.6367188,
+        2.7832031, 3.0761719, 3.149414, 3.2958984, 3.515625, 3.515625, 3.6621094, 3.515625, 3.7353516,
+        3.7353516, 3.8085938, 3.881836, 3.9550781, 3.8085938, 3.881836, 3.8085938, 3.9550781, 3.9550781,
+        3.9550781, 3.9550781, 4.0283203, 4.0283203, 3.9550781, 3.9550781, 3.881836, 3.881836, 3.8085938,
+        3.881836, 3.7353516, 3.5888672, 3.3691406, 3.3691406, 3.2226562, 3.0761719, 3.149414, 3.0029297,
+        2.6367188, 2.5634766, 2.4169922, 2.2705078, 2.0507812, 1.9042969, 1.9042969, 1.6113281, 1.3916016,
+        1.2451172, 0.95214844, 0.87890625, 0.14648438, 0, -0.29296875, -0.29296875, -0.43945312, -0.29296875,
+        -0.5859375, -0.6591797, -0.87890625, -1.0253906, -1.171875, -1.5380859, -1.4648438, -1.6113281,
+        -1.8310547, -1.9775391, -2.0507812, -2.1240234, -2.2705078, -2.709961, -2.6367188, -2.709961,
+        -2.709961, -2.8564453, -2.9296875, -2.9296875, -3.0029297, -3.0761719, -3.0761719, -3.0761719,
+        -3.2226562, -3.149414, -3.0029297, -3.149414, -3.2226562, -3.2226562, -3.2226562, -3.0761719,
+        -3.4423828, -3.2226562, -3.149414, -3.149414, -3.0029297, -2.9296875, -2.8564453, -2.709961,
+        -2.6367188, -2.4902344, -2.34375, -2.2705078, -2.1240234, -1.9775391, -1.9042969 };
+/**
+ * 统计最大/最小的前几个数
+ * 排序算法运算效率较低
+ */
+static void getTopDownAverage(float *data, int len, float *outTop, float *outDown) {
+
+    float top[5] = { 0 }, down[5] = { 0 };
+    float topAudit = top[0];
+    float downAudit = down[0];
+    float extreme = 0;
+    char replaceFlag = 0;
+    for (int i = 0; i < len; i++) {
+        if (data[i] > topAudit) {
+            extreme = 5000;
+            replaceFlag = 0;
+            for (int j = 0; j < 5; j++) {
+                if (replaceFlag == 0 && topAudit == top[j]) {
+                    top[j] = data[i]; //替换
+                    replaceFlag = 1;
+                }
+                if (top[j] < extreme) { //找最小值
+                    extreme = top[j];
+                }
+            }
+            topAudit = extreme;
+        } else if (data[i] < downAudit) {
+            extreme = -5000;
+            replaceFlag = 0;
+            for (int j = 0; j < 5; j++) {
+                if (replaceFlag == 0 && downAudit == down[j]) {
+                    down[j] = data[i]; //替换
+                    replaceFlag = 1;
+                }
+                if (down[j] > extreme) { //找最大值
+                    extreme = down[j];
+                }
+            }
+            downAudit = extreme;
+        }
+    }
+
+    float topTmp = 0, downTmp = 0;
+    for (int i = 0; i < 5; i++) {
+        *outTop += top[i];
+        if (top[i] > topTmp) {
+            topTmp = top[i];
+        }
+        *outDown += down[i];
+        if (down[i] < downTmp) {
+            downTmp = down[i];
+        }
+    }
+    *outTop = (*outTop - topTmp) / 4; //去除最大值
+    *outDown = (*outDown - downTmp) / 4; //去除最小值
+}
+
 int main() {
 
     registerPrintf(printf);
     printf("start\n");
 
-    setMaliLoadWhitelistMatchRatio(0,0.8,1.2);
+    setMaliLoadWhitelistMatchRatio(0, 0.8, 1.2);
 
 //    for (int i = 0; i < 500; i++) {
 //        U16 frontRed = i;
@@ -160,6 +232,10 @@ int main() {
 //        updateFrontRedBaseValue(frontRed);
 //    }
 
+    float outTop, outDown;
+    getTopDownAverage(f419, 128, &outTop, &outDown);
+
+    printf("%.3f %.3f\n", outTop, outDown);
     smoke_detect_test();
 
     //    float alarmThresh = 30;

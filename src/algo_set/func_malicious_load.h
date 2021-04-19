@@ -7,7 +7,7 @@
 #define MALI_LOAD_SENSITIVITY_HIGH 2
 void setMaliLoadAlarmSensitivity(int channel, int mode);
 int getMaliLoadAlarmSensitivity(int channel);
-int maliciousLoadDetect(int channel, float *fft, float pulseI, float deltaActivePower,
+int maliciousLoadDetect(int channel, float *fft, float pulseI, float curSamplePulse, float deltaActivePower,
         float deltaReactivePower, float effU, float activePower, float reactivePower, float voltageAberrRate,
         WaveFeature *deltaWf, DateStruct *date, char *errMsg);
 int initFuncMaliLoad(void);

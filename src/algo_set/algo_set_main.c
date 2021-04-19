@@ -37,10 +37,14 @@ static float gLastStableUWaveBuff[CHANNEL_NUM][WAVE_BUFF_NUM];
 static float gLastStableIEff[CHANNEL_NUM];
 static float gLastStableUEff[CHANNEL_NUM];
 static float gDeltaIWaveBuff[CHANNEL_NUM][WAVE_BUFF_NUM];
+static float gLastStableCurSamplePosTop[CHANNEL_NUM]; //上个稳态的电流采集点的正的最大值
+static float gLastStableCurSampleNegTop[CHANNEL_NUM]; //上个稳态的电流采集点的负的最大值
 
 static int gLastStable[CHANNEL_NUM]; // 上个周期的稳态情况
 static int gTransitTime[CHANNEL_NUM]; // 负荷变化过渡/非稳态时间
-static float gTransitTmpIMax[CHANNEL_NUM];
+static float gTransitTmpIMax[CHANNEL_NUM]; //电流变化过渡期有效值的最大值
+static float gTransitCurSamplePosTopMax[CHANNEL_NUM]; //电流变化过渡期采样点的正的最大值
+static float gTransitCurSampleNegTopMax[CHANNEL_NUM]; //电流变化过渡期采样点的正的最大值
 
 static float gLastStableActivePower[CHANNEL_NUM]; //稳态窗口下最近的有功功率,对于缓慢变化的场景会跟随变化
 static float gLastProcessedStableActivePower[CHANNEL_NUM]; //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
@@ -241,6 +245,63 @@ static void getOddFft(float *cur, int curStart, float oddFft[5]) {
 #endif
 }
 
+/**
+ * 统计最大/最小的前几个数
+ * 排序算法运算效率较低
+ */
+static void getTopDownAverage(float *data, int len, float *outTop, float *outDown) {
+
+    float top[5] = { 0 }, down[5] = { 0 };
+    float topAudit = top[0];
+    float downAudit = down[0];
+    float extreme = 0;
+    char replaceFlag = 0;
+    for (int i = 0; i < len; i++) {
+        if (data[i] > topAudit) {
+            extreme = 5000;
+            replaceFlag = 0;
+            for (int j = 0; j < 5; j++) {
+                if (replaceFlag == 0 && topAudit == top[j]) {
+                    top[j] = data[i]; //替换
+                    replaceFlag = 1;
+                }
+                if (top[j] < extreme) { //找最小值
+                    extreme = top[j];
+                }
+            }
+            topAudit = extreme;
+        } else if (data[i] < downAudit) {
+            extreme = -5000;
+            replaceFlag = 0;
+            for (int j = 0; j < 5; j++) {
+                if (replaceFlag == 0 && downAudit == down[j]) {
+                    down[j] = data[i]; //替换
+                    replaceFlag = 1;
+                }
+                if (down[j] > extreme) { //找最大值
+                    extreme = down[j];
+                }
+            }
+            downAudit = extreme;
+        }
+    }
+
+    float topTmp = 0, downTmp = 0;
+    for (int i = 0; i < 5; i++) {
+        *outTop += top[i];
+        if (top[i] > topTmp) {
+            topTmp = top[i];
+        }
+        *outDown += down[i];
+        if (down[i] < downTmp) {
+            downTmp = down[i];
+        }
+    }
+    *outTop = (*outTop - topTmp) / 4; //去除最大值
+    *outDown = (*outDown - downTmp) / 4; //去除最小值
+}
+
+//计算电压畸变率
 static float getAberrationRate(float *cur, int curStart) {
 #ifdef ARM_MATH_CM4
     arm_cfft_radix2_instance_f32 S;
@@ -464,6 +525,9 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     insertFloatArrayToBuff(gUWaveBuff[channel], WAVE_BUFF_NUM, vol, 128);
     insertFloatToBuff(gActivePBuff[channel], EFF_BUFF_NUM, activePower);
 
+    float curSamplePosTop = 0, curSampleNegTop = 0;
+    getTopDownAverage(cur, 128, &curSamplePosTop, &curSampleNegTop);
+
     //将功率插入10s短buff
     if (gTimer[channel] % 50 == 0) {
         PowerTrack powerTrack;
@@ -566,13 +630,14 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 //#endif
 //#endif
     //step:特征提取
-    float deltaEffI = LF, deltaEffU = LF, iPulse = LF, deltaActivePower = LF, deltaReactivePower = LF;
+    float deltaEffI = LF, deltaEffU = LF, iPulse = LF, deltaActivePower = LF, deltaReactivePower = LF,
+            curSamplePulse = LF;//斩波调节时没有脉冲,curSample可能小于1
     float deltaOddFft[5] = { LF, LF, LF, LF, LF }; //奇次谐波
     int startupTime = 0; // 启动时间
     int zeroCrossLast = -1, zeroCrossThis = -1; //上个周期及本个周期稳态电压穿越
 
     static float voltageAberrRate = 0;
-    if (gFuncMaliciousLoadEnabled && gTimer[channel] % 90000 == 10) { //每半小时更新一次电压畸变率，节省性能
+    if (gFuncMaliciousLoadEnabled && gTimer[0] % 90000 == 10) { //每半小时更新一次电压畸变率，节省性能
         voltageAberrRate = getAberrationRate(vol, 0);
         if (voltageAberrRate > 9)
             voltageAberrRate = 9;
@@ -609,16 +674,24 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         // feature4:
         iPulse = (gTransitTmpIMax[channel] - gLastStableIEff[channel]) / (effI - gLastStableIEff[channel]);
 
+        //过渡期间的采样值的脉冲比例
+        float curSamplePulsePos = (gTransitCurSamplePosTopMax[channel] - gLastStableCurSamplePosTop[channel])
+                / (curSamplePosTop - gLastStableCurSamplePosTop[channel]);
+        float curSamplePulseNeg = (gTransitCurSampleNegTopMax[channel] - gLastStableCurSampleNegTop[channel])
+                / (curSampleNegTop - gLastStableCurSampleNegTop[channel]);
+        curSamplePulse = curSamplePulsePos > curSamplePulseNeg ? curSamplePulsePos : curSamplePulseNeg;
+
         gLastProcessedStableActivePower[channel] = activePower; //稳态功率缓慢上升的场景,processed不会变
 
         getCurrentWaveFeature(gDeltaIWaveBuff[channel], 0, gUWaveBuff[channel], zeroCrossThis, deltaEffI,
                 deltaEffU, &deltaWf);
 
 #if LOG_ON == 1
-        printf("ext=%d flat=%d iPulse=%.2f lpap=%.2f dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f %.2f %.2f]\n",
-                deltaWf.extremeNum, deltaWf.flatNum, iPulse, gLastProcessedStableActivePower[channel],
-                deltaActivePower, deltaReactivePower, deltaOddFft[0], deltaOddFft[1], deltaOddFft[2],
-                deltaOddFft[3], deltaOddFft[4]);
+        printf(
+                "ext=%d flat=%d iPulse=%.2f csp=%.2f lpap=%.2f dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f %.2f %.2f]\n",
+                deltaWf.extremeNum, deltaWf.flatNum, iPulse, curSamplePulse,
+                gLastProcessedStableActivePower[channel], deltaActivePower, deltaReactivePower,
+                deltaOddFft[0], deltaOddFft[1], deltaOddFft[2], deltaOddFft[3], deltaOddFft[4]);
 #endif
     }
 
@@ -682,7 +755,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     if (gFuncMaliciousLoadEnabled && switchEventHappen) {
 
         char msg[50] = { 0 };
-        gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, deltaActivePower,
+        gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, curSamplePulse,deltaActivePower,
                 deltaReactivePower, effU, activePower, reactivePower, voltageAberrRate, &deltaWf, &ds, msg);
 #if TUOQIANG_DEBUG
 #if OUTLOG_ON
@@ -754,12 +827,22 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         gLastStableIEff[channel] = effI;
         gLastStableUEff[channel] = effU;
         gLastStableActivePower[channel] = activePower;
+        gLastStableCurSamplePosTop[channel] = curSamplePosTop;
+        gLastStableCurSampleNegTop[channel] = curSampleNegTop;
         gTransitTime[channel] = 0;
         gTransitTmpIMax[channel] = 0;
+        gTransitCurSamplePosTopMax[channel] = 0;
+        gTransitCurSampleNegTopMax[channel] = 0;
     } else { // 非稳态
         gTransitTime[channel]++;
         if (effI > gTransitTmpIMax[channel]) {
             gTransitTmpIMax[channel] = effI;
+        }
+        if (curSamplePosTop > gTransitCurSamplePosTopMax[channel]) {
+            gTransitCurSamplePosTopMax[channel] = curSamplePosTop;
+        }
+        if (curSampleNegTop < gTransitCurSampleNegTopMax[channel]) {
+            gTransitCurSampleNegTopMax[channel] = curSampleNegTop;
         }
     }
 
@@ -816,6 +899,8 @@ int initTpsonAlgoLib(void) {
     memset(gLastStableIWaveBuff, 0, sizeof(gLastStableIWaveBuff));
     memset(gLastStableUWaveBuff, 0, sizeof(gLastStableUWaveBuff));
     memset(gLastStableIEff, 0, sizeof(gLastStableIEff));
+    memset(gLastStableCurSamplePosTop, 0, sizeof(gLastStableCurSamplePosTop));
+    memset(gLastStableCurSampleNegTop, 0, sizeof(gLastStableCurSampleNegTop));
     memset(gLastStableUEff, 0, sizeof(gLastStableUEff));
     memset(gDeltaIWaveBuff, 0, sizeof(gDeltaIWaveBuff));
 
@@ -826,6 +911,8 @@ int initTpsonAlgoLib(void) {
 
     memset(gTransitTime, 0, sizeof(gTransitTime)); // 负荷变化过渡/非稳态时间
     memset(gTransitTmpIMax, 0, sizeof(gTransitTmpIMax));
+    memset(gTransitCurSamplePosTopMax, 0, sizeof(gTransitCurSamplePosTopMax));
+    memset(gTransitCurSampleNegTopMax, 0, sizeof(gTransitCurSampleNegTopMax));
 
     memset(gLastStableActivePower, 0, sizeof(gLastStableActivePower)); //稳态窗口下最近的有功功率,对于缓慢变化的场景会跟随变化
     memset(gLastProcessedStableActivePower, 0, sizeof(gLastProcessedStableActivePower)); //上次经过稳态事件处理的有功功率,对于缓慢变化的场景不会跟随变化
