@@ -65,8 +65,19 @@ void addMaliciousLoadWhitelist(int channel, float power) {
             return;
         }
     }
-
-    insertFloatToBuff(gPowerWhitelist[channel], POWER_WHITELIST_SIZE, power);
+    //优先找到0的进行替换
+    char inserted = 0;
+    for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
+        //已存在,返回
+        if (gPowerWhitelist[channel][i] < LF) {
+            gPowerWhitelist[channel][i] = power;
+            inserted = 1;
+            break;
+        }
+    }
+    if (!inserted) {
+        insertFloatToBuff(gPowerWhitelist[channel], POWER_WHITELIST_SIZE, power);
+    }
 #if OUTLOG_ON
     if (outprintf != NULL) {
         outprintf("[%d]add %.1f to whitelist \r\n", channel, power);
@@ -114,24 +125,43 @@ int removeFromMaliLoadWhitelist(int channel, float power) {
     return 1;
 }
 
-int getMaliciousLoadWhitelist(int channel, float *outWhilelist) {
+//清除所有白名单
+void clearMaliLoadWhitelist(int channel) {
+
+    for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
+        gPowerWhitelist[channel][i] = 0;
+    }
+    gPowerWhitelistNum[channel] = 0;
+}
+
+int getMaliciousLoadWhitelist(int channel, float *outWhitelist) {
     int outIndex = 0;
+    //先清0，防止调用者没有初始化0
+    for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
+        outWhitelist[i] = 0;
+    }
     for (int i = 0; i < POWER_WHITELIST_SIZE && outIndex < 10; i++) {
         if (gPowerWhitelist[channel][i] > LF) {
-            outWhilelist[outIndex++] = gPowerWhitelist[channel][i];
+            outWhitelist[outIndex++] = gPowerWhitelist[channel][i];
         }
     }
     return gPowerWhitelistNum[channel];
 }
 
-static int isInMaliciousLoadWhitelist(int channel, float power) {
-    if (power <= 0)
+/*
+ * standardPower: 换算成220v下的功率
+ * realPower: 实际运行的功率，用户实际看到的
+ */
+static int isInMaliciousLoadWhitelist(int channel, float standardPower, float realPower) {
+    if (standardPower <= 0)
         return 0;
     for (int i = 0; i < POWER_WHITELIST_SIZE; i++) {
         if (gPowerWhitelist[channel][i] < LF)
             continue;
-        float ratio = power / gPowerWhitelist[channel][i];
-        if (ratio >= gPowerMinRatio[channel] && ratio <= gPowerMaxRatio[channel]) {
+        float ratioStandard = standardPower / gPowerWhitelist[channel][i];
+        float ratioReal = realPower / gPowerWhitelist[channel][i];
+        if ((ratioStandard >= gPowerMinRatio[channel] && ratioStandard <= gPowerMaxRatio[channel])
+                || (ratioReal >= gPowerMinRatio[channel] && ratioReal <= gPowerMaxRatio[channel])) {
             return 1;
         }
     }
@@ -146,10 +176,11 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float curSamplePu
         return 0;
 
     int minFlatNum = 15;
-    float minPf = 0.97f, maxPulseI = 1.08f, minFft1d3 = 18, maxHarmRatio = 0.1f, minAcReactivePower = 200;
+    float minPf = 0.97f, maxPulseI = 1.07f, minFft1d3 = 18, maxHarmRatio = 0.1f, minAcReactivePower = 200;
     switch (gSensitivity[channel]) {
     case MALI_LOAD_SENSITIVITY_LOW: //低灵敏度
-        minPf = 0.985f; //越大越严
+        minPf = 1 - deltaActivePower * 0.0015f / 100; //越大越严，根据功率调整，小功率要求更高
+        minPf = minPf < 0.985f ? 0.985F : minPf;
         minFlatNum = 15; //越大越严
         maxPulseI = 1.03f; //越小越严
         minFft1d3 = 26; //越大越严
@@ -157,15 +188,17 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float curSamplePu
         minAcReactivePower = 250; //越大越严
         break;
     case MALI_LOAD_SENSITIVITY_MEDIUM:
-        minPf = 0.975f;
+        minPf = 1 - deltaActivePower * 0.004f / 100; //越大越严，根据功率调整，小功率要求更高
+        minPf = minPf < 0.975f ? 0.975F : minPf;
         minFlatNum = 14;
-        maxPulseI = 1.08f;
-        minFft1d3 = 21.0f;
+        maxPulseI = 1.07f;
+        minFft1d3 = 20.0f;
         maxHarmRatio = 0.12f;
         minAcReactivePower = 205;
         break;
     case MALI_LOAD_SENSITIVITY_HIGH: //高灵敏度
-        minPf = 0.96f;
+        minPf = 1 - deltaActivePower * 0.005f / 100; //越大越严，根据功率调整，小功率要求更高
+        minPf = minPf < 0.96f ? 0.96F : minPf;
         minFlatNum = 13;
         maxPulseI = 1.13f;
         minFft1d3 = 19;
@@ -179,10 +212,10 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float curSamplePu
 
     //step: 附加处理
     //脉冲
-    float maxCurSamplePulse = maxPulseI * 1.05f;//多百分之5
+    float maxCurSamplePulse = maxPulseI * 1.03f; //多3%
 
-    //电压畸变率修正
-    minFft1d3 -= voltageAberrRate;
+    //根据电压畸变率修正fft条件
+    minFft1d3 -= voltageAberrRate * 1.05f;
     if (minFft1d3 > 20)
         minFft1d3 = 20;
     if (minFft1d3 < 10)
@@ -200,7 +233,7 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float curSamplePu
         return 0;
     }
 
-    if (isInMaliciousLoadWhitelist(channel, stActivePower)) {
+    if (isInMaliciousLoadWhitelist(channel, stActivePower, deltaActivePower)) {
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("wl:%.2f\r\n", stActivePower);
@@ -228,8 +261,8 @@ int maliciousLoadDetect(int channel, float *fft, float pulseI, float curSamplePu
     } else {
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("pf:%.2f pi:%.2f f:%.1f va=%.1f\r\n", powerFactor, pulseI, fft[0] / (fft[1] + LF),
-                    voltageAberrRate);
+            outprintf("pf:%.3f %.3f pi:%.2f csp:%.2f f:%.1f va=%.1f\r\n", powerFactor, minPf, pulseI,
+                    curSamplePulse, fft[0] / (fft[1] + LF), voltageAberrRate);
         }
 #endif
     }

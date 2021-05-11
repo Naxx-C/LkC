@@ -82,7 +82,7 @@ void addMaliciousLoadWhitelist(int channel, float power);
  * 返回实际白名单的个数
  * outWhilelist为长度为10的float数组
  */
-int getMaliciousLoadWhitelist(int channel, float* outWhilelist);
+int getMaliciousLoadWhitelist(int channel, float* outWhitelist);
 /*
  * 将电器从白名单删除(自动寻找最匹配的删除,不需要严格一致)
  * 移除成功返回1，没有匹配返回0
@@ -93,6 +93,8 @@ int removeFromMaliLoadWhitelist(int channel, float power); //remove the best mat
 void setMaliLoadWhitelistMatchRatio(int channel, float minRatio, float maxRatio);
 //设置恶性负载最小检测范围,默认200w
 void setMaliLoadMinPower(int channel, float minPower);
+//清除所有白名单
+void clearMaliLoadWhitelist(int channel);
 
 
 /**arcfault detection config api*/

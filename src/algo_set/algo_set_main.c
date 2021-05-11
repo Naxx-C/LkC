@@ -23,7 +23,7 @@
 #endif
 
 /**固定定义区*/
-const static char VERSION[] = { 1, 0, 0, 4 };
+const static char VERSION[] = { 1, 0, 0, 6 };
 static const int B_MAX[3] = { 2021, 12, 30 }; //最大允许集成编译时间,其他地方是障眼法
 
 /**运行变量区*/
@@ -153,6 +153,10 @@ void setMinEventDeltaPower(int channel, float minEventDeltaPower) {
 
 float getPowerCost(int channel) {
     return gPowerCost[channel];
+}
+
+int getAlgoVersion(void) {
+    return VERSION[0] << 24 | VERSION[1] << 16 | VERSION[2] << 8 | VERSION[3];
 }
 
 // 过期判断
@@ -428,7 +432,7 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
     }
     printf("\n");
 #endif
-    // 极值点左右点数
+    // 32点 - 极值点左右点数
     int maxLeftNum = 0, maxRightNum = 0, minLeftNum = 0, minRightNum = 0;
     for (int i = maxIndex - 1; i >= 0; i--) {
         if ((flatBitmap & (0x1 << i)) == 0) {
@@ -461,6 +465,7 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
 
     //最大跳变和最大值
     float maxDelta = 0, maxValue = 0, minNegDelta = 0, minNegValue = 0;
+    char maxPointIndex = 0, minPointIndex = 0;
     for (int i = curStart; i < curStart + 127; i++) {
         float delta = cur[i + 1] - cur[i];
         if (delta > maxDelta) {
@@ -470,8 +475,43 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
         }
         if (cur[i] > maxValue) {
             maxValue = cur[i];
+            maxPointIndex = i;
         } else if (cur[i] < minNegValue) {
             minNegValue = cur[i];
+            minPointIndex = i;
+        }
+    }
+
+    // 128点 - 极值点左右点数
+    int maxLeftPointNum = 0, maxRightPointNum = 0, minLeftPointNum = 0, minRightPointNum = 0;
+    static const float R1 = 0.12f;
+    for (int i = maxPointIndex - 1; i >= 0; i--) {
+        if (cur[i] > maxValue * R1) {
+            maxLeftPointNum++;
+        } else {
+            break;
+        }
+    }
+    for (int i = maxPointIndex + 1; i < 128; i++) {
+        if (cur[i] > maxValue * R1) {
+            maxRightPointNum++;
+        } else {
+            break;
+        }
+    }
+
+    for (int i = minPointIndex - 1; i >= 0; i--) {
+        if (cur[i] < minNegValue * R1) {
+            minLeftPointNum++;
+        } else {
+            break;
+        }
+    }
+    for (int i = minPointIndex + 1; i < 128; i++) {
+        if (cur[i] < minNegValue * R1) {
+            minRightPointNum++;
+        } else {
+            break;
         }
     }
 
@@ -481,6 +521,10 @@ static int getCurrentWaveFeature(float *cur, int curStart, float *vol, int volSt
     wf->maxRightNum = maxRightNum;
     wf->minLeftNum = minLeftNum;
     wf->minRightNum = minRightNum;
+    wf->maxLeftPointNum = maxLeftPointNum;
+    wf->maxRightPointNum = maxRightPointNum;
+    wf->minLeftPointNum = minLeftPointNum;
+    wf->minRightPointNum = minRightPointNum;
     wf->maxDelta = maxDelta;
     wf->maxValue = maxValue;
     wf->minNegDelta = minNegDelta;
@@ -604,34 +648,9 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 //    lastApRiseCounter = apRiseCounter;
 //#endif
 //#endif
-
-//#if TUOQIANG_DEBUG
-//#if OUTLOG_ON
-//    if (outprintf != NULL && activePower > 1200 && switchEventHappen) {
-//        outprintf("====start print===\r\n");
-//        outprintf("====LU===\r\n");
-//        for (int i = 0; i < 128; i++) {
-//            outprintf("%.1f\t", gLastStableUWaveBuff[channel][i]);
-//        }
-//        outprintf("====U2===\r\n");
-//        for (int i = 0; i < 128; i++) {
-//            outprintf("%.1f\t\n", gUWaveBuff[channel][i]);
-//        }
-//        outprintf("====LI===\r\n");
-//        for (int i = 0; i < 256; i++) {
-//            outprintf("%.1f\t", gLastStableIWaveBuff[channel][i]);
-//        }
-//        outprintf("====I===\r\n");
-//        for (int i = 0; i < 128; i++) {
-//            outprintf("%.1f\t", gIWaveBuff[channel][i]);
-//        }
-//        outprintf("====end print===\r\n");
-//    }
-//#endif
-//#endif
     //step:特征提取
     float deltaEffI = LF, deltaEffU = LF, iPulse = LF, deltaActivePower = LF, deltaReactivePower = LF,
-            curSamplePulse = LF;//斩波调节时没有脉冲,curSample可能小于1
+            curSamplePulse = LF; //斩波调节时没有脉冲,curSample可能小于1
     float deltaOddFft[5] = { LF, LF, LF, LF, LF }; //奇次谐波
     int startupTime = 0; // 启动时间
     int zeroCrossLast = -1, zeroCrossThis = -1; //上个周期及本个周期稳态电压穿越
@@ -651,8 +670,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     memset(&deltaWf, 0, sizeof(deltaWf));
     if (switchEventHappen) {
         // 计算差分电流
-        zeroCrossLast = getZeroCrossIndex(gLastStableUWaveBuff[channel], 0, 128);
-        zeroCrossThis = getZeroCrossIndex(gUWaveBuff[channel], 0, 128);
+        zeroCrossLast = getZeroCrossIndex(gLastStableUWaveBuff[channel], 0, 256);
+        zeroCrossThis = getZeroCrossIndex(gUWaveBuff[channel], 0, 256);
 
         for (int i = 0; i < 128; i++) {
             gDeltaIWaveBuff[channel][i] = gIWaveBuff[channel][zeroCrossThis + i]
@@ -669,7 +688,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
         deltaReactivePower = getReactivePower(deltaActivePower, deltaEffI * deltaEffU);
 
         // feature3:
-        startupTime = gTransitTime[channel];
+        startupTime = gTransitTime[channel] - EFF_BUFF_NUM;
+        startupTime = startupTime < 0 ? 0 : startupTime;
 
         // feature4:
         iPulse = (gTransitTmpIMax[channel] - gLastStableIEff[channel]) / (effI - gLastStableIEff[channel]);
@@ -687,11 +707,17 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
                 deltaEffU, &deltaWf);
 
 #if LOG_ON == 1
-        printf(
-                "ext=%d flat=%d iPulse=%.2f csp=%.2f lpap=%.2f dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f %.2f %.2f]\n",
-                deltaWf.extremeNum, deltaWf.flatNum, iPulse, curSamplePulse,
-                gLastProcessedStableActivePower[channel], deltaActivePower, deltaReactivePower,
-                deltaOddFft[0], deltaOddFft[1], deltaOddFft[2], deltaOddFft[3], deltaOddFft[4]);
+        for (int i = 0; i < 128; i++) {
+            printf("%.2f\t", gDeltaIWaveBuff[channel][i]);
+        }
+        if (deltaActivePower > 0) {
+            printf("\n");
+            printf(
+                    "ext=%d flat=%d iPulse=%.2f csp=%.2f str=%d lpap=%.2f dap=%.2f drp=%.2f fft=[%.2f %.2f %.2f %.2f %.2f]\n",
+                    deltaWf.extremeNum, deltaWf.flatNum, iPulse, curSamplePulse, startupTime,
+                    gLastProcessedStableActivePower[channel], deltaActivePower, deltaReactivePower,
+                    deltaOddFft[0], deltaOddFft[1], deltaOddFft[2], deltaOddFft[3], deltaOddFft[4]);
+        }
 #endif
     }
 
@@ -739,9 +765,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 
     //充电检测
     if (gFuncChargingAlarmEnabled && switchEventHappen) {
-        gChargingAlarm[channel] = chargingDetect(channel, deltaOddFft, iPulse, deltaActivePower,
-                deltaReactivePower, &deltaWf,
-                NULL);
+        gChargingAlarm[channel] = chargingDetect(channel, deltaOddFft, iPulse, curSamplePulse, deltaActivePower,
+                deltaReactivePower, startupTime, &deltaWf, NULL);
         if (gChargingAlarm[channel]) {
 #if OUTLOG_ON
             if (outprintf != NULL) {
@@ -755,8 +780,9 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     if (gFuncMaliciousLoadEnabled && switchEventHappen) {
 
         char msg[50] = { 0 };
-        gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, curSamplePulse,deltaActivePower,
-                deltaReactivePower, effU, activePower, reactivePower, voltageAberrRate, &deltaWf, &ds, msg);
+        gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, curSamplePulse,
+                deltaActivePower, deltaReactivePower, effU, activePower, reactivePower, voltageAberrRate,
+                &deltaWf, &ds, msg);
 #if TUOQIANG_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
@@ -782,7 +808,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
                 &gArcNum[channel], &gThisPeriodNum[channel], NULL);
 
         static char lastArcFaultAlarm[CHANNEL_NUM] = { 0 };
-        if (gArcfaultAlarm[channel] && dormConverterAlarmTimeDelta <= 10) { //调压器与故障电弧互斥,发现调压器的10s内不再报电弧
+        if (gArcfaultAlarm[channel] && dormConverterAlarmTimeDelta <= 20) { //调压器与故障电弧互斥,发现调压器的10s内不再报电弧
 #if OUTLOG_ON
 
             if (outprintf != NULL && gArcfaultAlarm[channel] > lastArcFaultAlarm[channel]) {
@@ -947,12 +973,8 @@ int initTpsonAlgoLib(void) {
         return -2;
 #if OUTLOG_ON
     if (outprintf != NULL) {
-        outprintf("init ok\r\n");
+        outprintf("init ok v%d\r\n", getAlgoVersion());
     }
 #endif
     return 0;
-}
-
-int getAlgoVersion(void) {
-    return VERSION[0] << 24 | VERSION[1] << 16 | VERSION[2] << 8 | VERSION[3];
 }

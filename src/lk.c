@@ -217,13 +217,30 @@ static void getTopDownAverage(float *data, int len, float *outTop, float *outDow
     *outTop = (*outTop - topTmp) / 4; //去除最大值
     *outDown = (*outDown - downTmp) / 4; //去除最小值
 }
+extern void smoke_detect_test(void);
 
 int main() {
-
+    setvbuf(stdout, NULL, _IONBF, 0);
     registerPrintf(printf);
     printf("start\n");
-
-    setMaliLoadWhitelistMatchRatio(0, 0.8, 1.2);
+    addMaliciousLoadWhitelist(0, 500);
+//    920W，1140W，1800W，680W，1400W，2400W，340W，560W，800W，200W
+//    addMaliciousLoadWhitelist(0, 920);
+//    addMaliciousLoadWhitelist(0, 1140);
+//    addMaliciousLoadWhitelist(0, 1800);
+//    addMaliciousLoadWhitelist(0, 680);
+//    addMaliciousLoadWhitelist(0, 1400);
+//    addMaliciousLoadWhitelist(0, 2400);
+//    addMaliciousLoadWhitelist(0, 200);
+//    addMaliciousLoadWhitelist(0, 340);
+//    addMaliciousLoadWhitelist(0, 560);
+//    addMaliciousLoadWhitelist(0, 800);
+//    float outWhitelist[10] = { 0 };
+//    removeFromMaliLoadWhitelist(0, 200);
+//    memset(outWhitelist, 0, sizeof(outWhitelist));
+//    getMaliciousLoadWhitelist(0, outWhitelist);
+//    addMaliciousLoadWhitelist(0, 2000);
+//    getMaliciousLoadWhitelist(0, outWhitelist);
 
 //    for (int i = 0; i < 500; i++) {
 //        U16 frontRed = i;
@@ -232,11 +249,7 @@ int main() {
 //        updateFrontRedBaseValue(frontRed);
 //    }
 
-    float outTop, outDown;
-    getTopDownAverage(f419, 128, &outTop, &outDown);
-
-    printf("%.3f %.3f\n", outTop, outDown);
-    smoke_detect_test();
+//    smoke_detect_test();
 
     //    float alarmThresh = 30;
 //    float a02[N] = { 0 }, a10[N] = { 0 }, c02[N] = { 0 }, c10[N] = { 0 };

@@ -9,10 +9,14 @@
 typedef struct {
     int flatNum; //平肩数目
     int extremeNum; //极值点数目
-    int maxLeftNum; //极大/极小值点左右的非平肩点数
+    int maxLeftNum; //32-点 极大/极小值点左右的非平肩点数
     int maxRightNum;
     int minLeftNum;
     int minRightNum;
+    int maxLeftPointNum; //128-点 极大/极小值点左右的非平肩点数
+    int maxRightPointNum;
+    int minLeftPointNum;
+    int minRightPointNum;
     float maxDelta;//最大正跳变
     float maxValue;//最大值
     float minNegDelta;//负半周最大跳变

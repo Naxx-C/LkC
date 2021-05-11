@@ -52,9 +52,11 @@ static float chargers[][5] = { { 1.24, 0.89, 0.413, 0.24, 0.321 }, //wangao
  * deltaActivePower:差分有功功率
  * deltaReactivePower:差分无功功率
  */
-int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower, float deltaReactivePower,
-        WaveFeature *wf, char *errMsg) {
+int chargingDetect(int channel, float *fft, float pulseI, float curSamplePulse, float deltaActivePower,
+        float deltaReactivePower, int startupTime, WaveFeature *wf, char *errMsg) {
 
+    if (deltaActivePower < 0)
+        return 0;
     float pulseIThresh = 1.5f;
     float thetaThresh = 13;
     int minExtreme = 2, maxExtreme = 2;
@@ -73,7 +75,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         maxDeltaRatio = 0.75f; //越小越严
         break;
     case CHARGING_ALARM_SENSITIVITY_MEDIUM:
-        pulseIThresh = 1.0f;
+        pulseIThresh = 0.9f; //正常为大于等于1
         thetaThresh = 10.5;
         maxExtreme = 4;
         minFlat = 16;
@@ -107,27 +109,16 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         maxActivePower = gPresetMaxPower[channel];
     }
 
+    float maxPulse = pulseI > curSamplePulse ? pulseI : curSamplePulse;
     if (deltaActivePower < minActivePower || deltaActivePower > maxActivePower || pulseI < pulseIThresh
-            || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1 || fft[1] * 1.05f > fft[0]) {
-#ifdef TMP_DEBUG
+            || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1 || fft[1] * 1.05f > fft[0]
+            || (startupTime >= 5 && maxPulse < 2.5f) || deltaReactivePower < minReactivePower) {
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("da=%.0f pi=%.1f fr=%.2f f1=%.2f f3=%.2f\n", deltaActivePower, pulseI,
+            outprintf("da=%.0f pi=%.1f csp=%.1f str=%d rp=%.0f fr=%.2f f1=%.2f f3=%.2f\n", deltaActivePower,
+                    pulseI, curSamplePulse, startupTime, deltaReactivePower,
                     (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f), fft[0], fft[1]);
         }
-#endif
-#endif
-        return 0;
-    }
-
-    //无功功率判断
-    if (deltaReactivePower < minReactivePower) {
-#ifdef TMP_DEBUG
-#if OUTLOG_ON
-        if (outprintf != NULL) {
-            outprintf("rp=%.0f", deltaReactivePower);
-        }
-#endif
 #endif
         return 0;
     }
@@ -150,41 +141,39 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
     }
 
     if (wf->flatNum < minFlat || wf->extremeNum < minExtreme || wf->extremeNum > maxExtreme) {
-#ifdef TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("fn=%d en=%d", wf->flatNum, wf->extremeNum);
         }
-#endif
 #endif
         return 0;
     }
 
     //排除斩波电路干扰. 斩波会从平肩直接跳变到最大值，充电会有个上升过程
     if (wf->maxDelta >= wf->maxValue * maxDeltaRatio) {
-#ifdef TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("mad=%.2f mav=%.2f", wf->maxDelta, wf->maxValue);
         }
-#endif
 #endif
         return 0;
     }
 
     //极值点左右点数
     int checkPass = 1;
+    int unmatchCounter = 0;
     switch (gSensitivity[channel]) {
     case CHARGING_ALARM_SENSITIVITY_HIGH:
         checkPass = 1;
         break;
-    case CHARGING_ALARM_SENSITIVITY_MEDIUM:
-        if (wf->maxLeftNum >= wf->maxRightNum || wf->minLeftNum >= wf->minRightNum) {
-            checkPass = 0;
-        }
-        break;
+    case CHARGING_ALARM_SENSITIVITY_MEDIUM: //中灵敏度
     case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
-        if (wf->maxLeftNum >= wf->maxRightNum || wf->minLeftNum >= wf->minRightNum) {
+        unmatchCounter = (wf->maxLeftNum >= wf->maxRightNum) + (wf->minLeftNum >= wf->minRightNum)
+                + (wf->maxLeftPointNum >= wf->maxRightPointNum)
+                + (wf->minLeftPointNum >= wf->minRightPointNum);
+
+        if (unmatchCounter >= 2 || wf->maxLeftPointNum >= wf->maxRightPointNum
+                || wf->minLeftPointNum >= wf->minRightPointNum) {
             checkPass = 0;
         }
         break;
@@ -192,21 +181,19 @@ int chargingDetect(int channel, float *fft, float pulseI, float deltaActivePower
         break;
     }
     if (checkPass == 0) {
-#ifdef TMP_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("near=%d %d %d %d", wf->maxLeftNum, wf->maxRightNum, wf->minLeftNum, wf->minRightNum);
+            outprintf("near=%d %d %d %d | %d %d %d %d\r\n", wf->maxLeftNum, wf->maxRightNum, wf->minLeftNum,
+                    wf->minRightNum, wf->maxLeftPointNum, wf->maxRightPointNum, wf->minLeftPointNum,
+                    wf->minRightPointNum);
         }
-#endif
 #endif
         return 0;
     }
-#ifdef TMP_DEBUG
 #if OUTLOG_ON
     if (outprintf != NULL) {
-        outprintf("charging detected fn=%d en=%d", wf->flatNum, wf->extremeNum);
+        outprintf("charging detected fn=%d en=%d\r\n", wf->flatNum, wf->extremeNum);
     }
-#endif
 #endif
     return 1;
 }

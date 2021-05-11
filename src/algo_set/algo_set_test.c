@@ -24,12 +24,6 @@
 //static char *onePath = "F:\\Tmp\\tiaoyawubao";
 //static char *onePath = "F:\\Tmp\\fail";
 static char gDirs[][100] = {
-//        "F:\\Tmp\\tiaoya_3lk2", "F:\\Tmp\\tiaoyalk2", "F:\\Tmp\\charginglk2",
-//        "F:\\Tmp\\bianpinkongtiaolk2", "F:\\Tmp\\maliload_diancilulk2", "F:\\Tmp\\maliload_zhudanqilk2",
-//        "F:\\Tmp\\maliload_dianchuifeng", "F:\\Tmp\\maliload_reshuiqi",
-//        "F:\\Tmp\\charging_laptop_wubaolk2", "F:\\Tmp\\charging_misslk2", "F:\\Tmp\\charging_wubaolk2",
-//        "F:\\data\\ArcfaultData\\20200409\\warmer_2k_arc", "F:\\Tmp\\dorm_falsealarm_charginglk2",
-//        "F:\\Tmp\\arcfault_falsealarm\\diantaolu",
 //        "F:\\data\\ArcfaultData\\category\\RealAlarm\\hairdryer",
 //        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\diancilu",
 //        "F:\\data\\ArcfaultData\\category\\FalseAlarm\\tiaoyaqi",
@@ -44,7 +38,36 @@ static char gDirs[][100] = {
 //        "F:\\Tmp\\chuifengji"
 //        "F:\\data\\maliload\\MissAlarm",
 //        "F:\\data\\maliload\\MissAlarm\\jibian",
-        "F:\\data\\maliload\\FalseAlarm\\xiyiji_false_to_mali"
+//        "F:\\data\\maliload\\FalseAlarm\\xiyiji_false_to_mali"
+//        "F:\\data\\maliload\\MissAlarm\\diancilu"
+//        "F:\\data\\devices\\fridge\\FalseAlarm_to_Maliload_min90W"
+//        "F:\\data\\devices\\fridge\\FalseAlarm_to_Maliload_and_Charging_min30W"
+//        "F:\\data\\devices\\fridge\\FalseAlarm"
+//        "F:\\data\\devices\\fridge\\bug11681"
+//        "F:\\data\\devices\\fridge"
+//        "F:\\data\\devices\\humidifier\\g1"
+//        "F:\\data\\devices\\charging\\true"
+
+//        "F:\\Tmp\\bug\\20210423\\fridge\\g3"
+//        "F:\\Tmp\\bug\\20210423\\aux_350w\\True"
+//        "F:\\Tmp\\bug\\20210423\\kangfu_dianchuifeng\\780w_yes"
+//        "F:\\Tmp\\bug\\20210423\\fulizi_dianchuifeng\\l3_640W_yes"
+//        "F:\\Tmp\\bug\\20210423\\fulizi_dianchuifeng\\l1_360w_yes"
+//        "F:\\Tmp\\bug\\20210423\\dormconverter_false_alarm\\adjusting_arcfault"
+//        "F:\\Tmp\\bug\\20210423\\dormconverter_false_alarm\\adjusting_dc_detected_then_arcfalt\\g2"
+//        "F:\\Tmp\\bug\\20210506"//充电误报
+//        "F:\\data\\devices\\hairdrier\\miss"
+//        "F:\\data\\devices\\warmer\\miss"
+        "F:\\data\\devices\\waterFountain"
+
+//          "F:\\data\\devices\\charging\\true"
+//        "F:\\data\\devices\\charging\\true\\first_batt_then_charger0"
+//        "F:\\data\\devices\\charging\\true\\first_charger_then_batt"
+//        "F:\\data\\devices\\washer\\t2"
+//        "F:\\data\\devices\\fridge\\FalseAlarm_to_Charging"
+//        "F:\\Tmp\\bug\\20210427\\FalseAlarm_DC_To_Arcfault_bug11647"
+//        "F:\\data\\ArcfaultData\\category\\RealAlarm\\20210429"
+//        "F:\\data\\devices\\dormConverter\\FalseAlarm_to_Arcfault\\device1\\fix_level\\g1_L9"
         };
 
 static int init() {
@@ -54,15 +77,15 @@ static int init() {
         printf("initerr=%d\n", initRet);
     }
 
-//    setModuleEnable(ALGO_CHARGING_DETECT, 1);
-//    setChargingAlarmSensitivity(0, CHARGING_ALARM_SENSITIVITY_HIGH);
-//    setMinEventDeltaPower(0, 30);
+    setChargingAlarmSensitivity(0, CHARGING_ALARM_SENSITIVITY_MEDIUM);
+    setMinEventDeltaPower(0, 30);
     setMinChargingDevicePower(0, 30);
 //    setModuleEnable(ALGO_NILM_CLOUD_FEATURE, 1);
-    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+//    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
+//    setModuleEnable(ALGO_CHARGING_DETECT, 1);
     setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
 //    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
-//    setArcfaultSensitivity(0, ARCFAULT_SENSITIVITY_MEDIUM);
+//    setArcfaultSensitivity(0, ARCFAULT_SENSITIVITY_HIGH);
 //    setDormConverterAlarmSensitivity(0, DORM_CONVERTER_SENSITIVITY_HIGH);
 
     for (int channel = 0; channel < CHANNEL_NUM; channel++) {

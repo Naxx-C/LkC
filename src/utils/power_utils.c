@@ -24,7 +24,7 @@ float getEffectiveValue(float data[], int start, int len) {
     return (float) sqrt(sumOfSquares / len);
 }
 
-// 过零检测
+// 过零检测 [start,end)
 int getZeroCrossIndex(float data[], int start, int end) {
     for (int i = start; i < end; i++) {
         if (data[i] <= 0.0f && data[i + 1] > 0.0f) {

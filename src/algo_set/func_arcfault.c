@@ -21,8 +21,8 @@ static int gDelayCheckTime[CHANNEL_NUM]; // 50 延迟报警时间
 static float gResJumpRatio[CHANNEL_NUM]; //3.5f 阻性负载最少跳变threshDelta的倍数
 static int gAlarmThresh[CHANNEL_NUM]; // 14  故障电弧报警阈值，大于10，默认14
 static int gDutyRatioThresh[CHANNEL_NUM]; // 92
-static int gArc2NumRatioThresh[CHANNEL_NUM]; // 40
-static int gMaxSeriesThresh[CHANNEL_NUM]; // 25
+static int gArc2NumRatioThresh[CHANNEL_NUM]; // 45
+static int gMaxSeriesThresh[CHANNEL_NUM]; // 30
 static float gResFollowJumpMaxRatio[CHANNEL_NUM]; // 3.5f 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
 static float gInductJumpRatio[CHANNEL_NUM]; // 3.3f 感性负载最少跳变threshDelta的倍数
 static float gResJumpThresh[CHANNEL_NUM]; // 1.0f 阻性负载最小跳跃幅度，单位A
@@ -114,8 +114,8 @@ void setArcfaultSensitivity(int channel, int sensitivity) {
         gResJumpRatio[channel] = 3.5f;
         gAlarmThresh[channel] = 14;
         gDutyRatioThresh[channel] = 92;
-        gArc2NumRatioThresh[channel] = 40;
-        gMaxSeriesThresh[channel] = 25;
+        gArc2NumRatioThresh[channel] = 45;
+        gMaxSeriesThresh[channel] = 30;
         gResFollowJumpMaxRatio[channel] = 3.5f;
         gInductJumpRatio[channel] = 3.3f;
         gResJumpThresh[channel] = 1.0f;
@@ -417,8 +417,8 @@ int initFuncArcfault(void) {
         gResJumpRatio[i] = 3.5f; // 阻性负载最少跳变threshDelta的倍数
         gAlarmThresh[i] = 14; // 故障电弧报警阈值，大于10，默认14
         gDutyRatioThresh[i] = 92;
-        gArc2NumRatioThresh[i] = 40;
-        gMaxSeriesThresh[i] = 25;
+        gArc2NumRatioThresh[i] = 45;
+        gMaxSeriesThresh[i] = 30;
         gResFollowJumpMaxRatio[i] = 3.5f; // 阻性负载跳变发生处,后续跳变的倍数不可大于跳变处，越大越难通过
         gInductJumpRatio[i] = 3.3f; // 感性负载最少跳变threshDelta的倍数
         gResJumpThresh[i] = 1.0f; // 阻性负载最小跳跃幅度，单位A
@@ -681,13 +681,14 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
 
     // 综合判断是否需要故障电弧报警
 
-    int resArcNum1S = 0, inductArcNum1S = 0;
+    int resArcNum1S = 0, inductArcNum1S = 0, easyArcNum1S = 0;
     int dutyCounter = 0, dutyRatio = 0, have2Number = 0, tmpSeries = 0, maxSeries = 0;
     int start = -1, end = -1, totalLen = 0;
     for (int i = gArcBuffIndex[channel]; i < gArcBuffIndex[channel] + 50; i++) {
         int index = i % 50;
         resArcNum1S += gResArcBuff[channel][index];
         inductArcNum1S += gInductArcBuff[channel][index];
+        easyArcNum1S += gEasyArcBuff[channel][index];
         if (gEasyArcBuff[channel][index] > 0) {
             dutyCounter++;
             if (gEasyArcBuff[channel][index] > 1)
@@ -716,14 +717,22 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
     if (outThisPeriodNum != NULL)
         *outThisPeriodNum = arcNumThisPeriod;
 
-#if LOG_ON
-    static int lastArcNum1S[CHANNEL_NUM] = {0};
+    static int lastArcNum1S[CHANNEL_NUM] = { 0 };
     if (arcNum1S != lastArcNum1S[channel] && arcNum1S > 0) {
-        printf("arcNum1S=%d last=%d this=%d timer=%d\n", arcNum1S, lastArcNum1S[channel], arcNumThisPeriod,
-                gTimer[channel]);
+#if LOG_ON
+        printf("ean1S=%d arcNum1S=%d last=%d this=%d timer=%d\n", easyArcNum1S, arcNum1S,
+                lastArcNum1S[channel], arcNumThisPeriod, gTimer[channel]);
+#endif
+//#if TMP_DEBUG && !LOG_ON
+//#if OUTLOG_ON
+//        if (outprintf != NULL) {
+//            outprintf("[%d]ean1S=%d arcNum1S=%d last=%d this=%d timer=%d\n", channel, easyArcNum1S, arcNum1S,
+//                    lastArcNum1S[channel], arcNumThisPeriod, gTimer[channel]);
+//        }
+//#endif
+//#endif
     }
     lastArcNum1S[channel] = arcNum1S;
-#endif
 
     // 检测到电弧14个->进入待确认状态->在待确认期间发现不符合条件直接进入免疫->切出稳态后再继续进入正常检测期
     int fluctCheckEnd = gMoreInfoIndex[channel], fluctCheckLen = MOREINFO_BUFF_NUM;
@@ -740,7 +749,16 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                     MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
                 gStatus[channel] = STATUS_IMMUNE;
 #if LOG_ON
-            printf("arc [STATUS_NORMAL] to [STATUS_IMMUNE] timer=%d\n",gTimer[channel]);
+                printf("[%d]arc [STATUS_NORMAL] to [STATUS_IMMUNE] gt=%d dr=%d h2n=%d ms=%d\r\n", channel,
+                        gTimer[channel], dutyRatio, have2Number * 100 / totalLen, maxSeries);
+#endif
+#if TMP_DEBUG && !LOG_ON
+#if OUTLOG_ON
+                if (outprintf != NULL) {
+                    outprintf("[%d]arc [STATUS_NORMAL] to [STATUS_IMMUNE] gt=%d dr=%d h2n=%d ms=%d\r\n",
+                            channel, gTimer[channel], dutyRatio, have2Number * 100 / totalLen, maxSeries);
+                }
+#endif
 #endif
                 break;
             }
@@ -760,12 +778,27 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
             gStatus[channel] = STATUS_WAITING_CHECK;
             gArcNumAlarming[channel] = arcNum1S; // 记录当前电弧数目，留做报警时传递
 #if LOG_ON
-            printf("arc [STATUS_NORMAL] to [STATUS_WAITING_CHECK] timer=%d\n",gTimer[channel]);
+            printf("arc [STATUS_NORMAL] to [STATUS_WAITING_CHECK] timer=%d\n", gTimer[channel]);
+#endif
+#if TMP_DEBUG && !LOG_ON
+#if OUTLOG_ON
+            if (outprintf != NULL) {
+                outprintf("[%d]arc [STATUS_NORMAL] to [STATUS_WAITING_CHECK] gt=%d\r\n", channel,
+                        gTimer[channel]);
+            }
+#endif
 #endif
         }
         break;
     case STATUS_WAITING_CHECK:
         if (gTimer[channel] - gWatingTime[channel] > gDelayCheckTime[channel]) {
+#if TMP_DEBUG
+#if OUTLOG_ON
+            if (outprintf != NULL) {
+                outprintf("[%d] gt=%d effValue=%.1f\r\n", channel, gTimer[channel], effValue);
+            }
+#endif
+#endif
             gStatus[channel] = STATUS_NORMAL;
             if (effValue > 1.5f) {
                 pAlarmCounter[channel]++;
@@ -782,19 +815,36 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
                         MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) < 9)) {
             gStatus[channel] = STATUS_IMMUNE;
 #if LOG_ON
-            printf("arc [STATUS_WAITING_CHECK] to [STATUS_IMMUNE] timer=%d\n",gTimer[channel]);
+            printf("[%d]arc [STATUS_WAITING_CHECK] to [STATUS_IMMUNE] gt=%d dr=%d h2n=%d ms=%d\r\n", channel,
+                    gTimer[channel], dutyRatio, have2Number * 100 / totalLen, maxSeries);
+#endif
+#if TMP_DEBUG && !LOG_ON
+#if OUTLOG_ON
+            if (outprintf != NULL) {
+                outprintf("[%d]arc [STATUS_WAITING_CHECK] to [STATUS_IMMUNE] gt=%d dr=%d h2n=%d ms=%d\r\n",
+                        channel, gTimer[channel], dutyRatio, have2Number * 100 / totalLen, maxSeries);
+            }
+#endif
 #endif
             break;
         }
         break;
     case STATUS_IMMUNE:
         // 电流波动率超过5%或者谐波波动率超过10%
-        if (getLastestFluctuation(gEffBuff[channel], MOREINFO_BUFF_NUM, gMoreInfoIndex[channel],
-        MOREINFO_BUFF_NUM, 0.2f) > 5 || (gFftEnabled && getLastestFluctuation(gHarmonicBuff[channel],
-        MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) > 10)) {
+        if ((getLastestFluctuation(gEffBuff[channel], MOREINFO_BUFF_NUM, gMoreInfoIndex[channel],
+        MOREINFO_BUFF_NUM, 0.4f) > 10 && effValue >= 1.0f)
+                || (gFftEnabled && getLastestFluctuation(gHarmonicBuff[channel],
+                MOREINFO_BUFF_NUM, fluctCheckEnd, fluctCheckLen, 1.5f) > 10)) {
             gStatus[channel] = STATUS_NORMAL;
 #if LOG_ON
-            printf("arc [STATUS_IMMUNE] to [STATUS_NORMAL] timer=%d\n",gTimer[channel]);
+            printf("[%d]arc [STATUS_IMMUNE] to [STATUS_NORMAL] gt=%d\n", channel, gTimer[channel]);
+#endif
+#if TMP_DEBUG && !LOG_ON
+#if OUTLOG_ON
+            if (outprintf != NULL) {
+                outprintf("[%d]arc [STATUS_IMMUNE] to [STATUS_NORMAL] gt=%d\n", channel, gTimer[channel]);
+            }
+#endif
 #endif
         }
         break;
@@ -805,6 +855,7 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
 
         if (arcNum1S >= 8 && arcNumThisPeriod > 0) {
             int zeroCross = getZeroCrossIndex(voltage, 0, 128);
+            zeroCross = zeroCross < 0 ? 0 : zeroCross; //电压一定有过0点
             ArcCalFeature(channel, current, zeroCross, 128, effValue, arcNum1S, arcNumThisPeriod);
         }
 
@@ -831,12 +882,12 @@ int arcfaultDetect(int channel, int unixTime, DateStruct *ds, float *current, fl
 
         //连续超过阈值60*1次
         if (gTimer[channel] % 50 == 49) {
-            if (arcNum1S >= gSmartmodeNumTriggerPerSecond) {
+            if (easyArcNum1S >= gSmartmodeNumTriggerPerSecond) {
                 gSmartmodeNumTrigger[channel]++;
                 gNumTriggerMissedCounter[channel] = 0;
 #if OUTLOG_ON
                 if (outprintf != NULL) {
-                    outprintf("nc=%d gt=%d\r\n", gSmartmodeNumTrigger[channel], gTimer[channel]);
+                    outprintf("[%d]nc=%d gt=%d\r\n", channel, gSmartmodeNumTrigger[channel], gTimer[channel]);
                 }
 #endif
             } else {

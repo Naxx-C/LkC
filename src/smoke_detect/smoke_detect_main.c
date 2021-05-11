@@ -7,8 +7,8 @@
 static U16 gFrontRedBuff[BUFF_SIZE] = { 0 }; //判断短期趋势，有烟雾时间隔5s，无烟雾间隔10s
 static float gFrontRedBase = 0;
 
-#define BUFF_30S_SIZE 6
-static U16 gFrontRedBuff30S[BUFF_30S_SIZE] = { 0 }; //惩罚算法用
+#define BUFF_5S_SIZE 12
+static U16 gFrontRedBuff5S[BUFF_5S_SIZE] = { 0 }; //惩罚算法用
 
 static U16 gFrontBlueBuff[BUFF_SIZE] = { 0 };
 static float gFrontBlueBase = 0;
@@ -57,9 +57,9 @@ static void updateBaseValue(float *curBase, U16 sampleValue, U16 filterThresh) {
             *curBase = (sampleValue * 0.1 + *curBase * 99.9) / 100;
         }
     }
-//
-//    if (outprintf != NULL)
-//        outprintf("%d: %d\n", sampleValue, gFrontRedBase);
+    //
+    //    if (outprintf != NULL)
+    //        outprintf("%d: %d\n", sampleValue, gFrontRedBase);
 }
 static char checkMazeFault(SMOKE_DETECT_RESULT *smokeDetectResult, SAMPLE_VALUE sampleValue) {
     static U8 lighLeakageCounter = 0, mazeFaultCounter = 0;
@@ -98,7 +98,7 @@ static char checkSmoke(SMOKE_DETECT_RESULT *smokeDetectResult, SAMPLE_VALUE samp
     S16 deltaFrontBlue = sampleValue.frontBlue - gFrontBlueBase;
 
     //进烟速度惩罚
-    U16 frontRedFinal = smokeSamplePulish(sampleValue.frontRed, gFrontRedBuff30S[BUFF_30S_SIZE - 2]); //2*30=1min
+    U16 frontRedFinal = smokeSamplePulish(sampleValue.frontRed, gFrontRedBuff5S[0]); //1min
 
     //烟雾判断
     S16 deltaFrontRedFinal = frontRedFinal - gFrontRedBase;
@@ -156,10 +156,24 @@ char smoke_detect(SMOKE_DETECT_RESULT *smokeDetectResult, SAMPLE_VALUE sampleVal
     //buff更新
     insertDataToBuff(gFrontBlueBuff, BUFF_SIZE, sampleValue.frontBlue);
     insertDataToBuff(gFrontRedBuff, BUFF_SIZE, sampleValue.frontRed);
-    static int lastFrontRed30SInsertTime = 0;
-    if (unixTime - lastFrontRed30SInsertTime >= 28) {
-        insertDataToBuff(gFrontRedBuff30S, BUFF_30S_SIZE, sampleValue.frontRed);
-        lastFrontRed30SInsertTime = unixTime;
+    static int lastFrontRed5SInsertTime = 0, lastFrontRed5SInsertValue = 0;
+    if (unixTime < lastFrontRed5SInsertTime) { //防止时间突变错乱
+        lastFrontRed5SInsertTime = 0;
+    }
+    //有5S采样和10S采样两种可能,实际中时间戳可能还会有少许误差
+    int deltaInsertTime = unixTime - lastFrontRed5SInsertTime + 1; //多加1s冗余
+    if (deltaInsertTime >= 5) {
+        if (lastFrontRed5SInsertTime > 0) { //首次忽略
+            int num = deltaInsertTime / 5;
+            S16 deltaValue = (sampleValue.frontRed - lastFrontRed5SInsertValue) / num;
+            for (int i = 0; i < num - 1; i++) {
+                //差分插入
+                insertDataToBuff(gFrontRedBuff5S, BUFF_5S_SIZE, lastFrontRed5SInsertValue + deltaValue);
+            }
+        }
+        insertDataToBuff(gFrontRedBuff5S, BUFF_5S_SIZE, sampleValue.frontRed); //最后一个单独处理,避免精度损失
+        lastFrontRed5SInsertValue = sampleValue.frontRed;
+        lastFrontRed5SInsertTime = unixTime;
     }
 
     //更新本底值
@@ -174,9 +188,9 @@ char smoke_detect(SMOKE_DETECT_RESULT *smokeDetectResult, SAMPLE_VALUE sampleVal
         checkSmoke(smokeDetectResult, sampleValue);
     }
 
-//    U16 deltaFrontBlue = frontBlue - backgroundValue;
-//    U16 deltaBackRed = backRed - backgroundValue;
-//    insertDataToBuff(gBackgroundValue, BUFF_SIZE, deltaBackRed);
+    //    U16 deltaFrontBlue = frontBlue - backgroundValue;
+    //    U16 deltaBackRed = backRed - backgroundValue;
+    //    insertDataToBuff(gBackgroundValue, BUFF_SIZE, deltaBackRed);
 
     gIsFirst = 0;
     gLastUnixTime = unixTime;
