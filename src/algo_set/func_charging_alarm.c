@@ -13,9 +13,12 @@ static float gPresetMinPower[CHANNEL_NUM]; //-1表示未配置
 static float gPresetMaxPower[CHANNEL_NUM];
 
 void setMinChargingDevicePower(int channel, float power) {
+    if (power < 50) {
+        return;
+    }
     gPresetMinPower[channel] = power;
-
 }
+
 void setMaxChargingDevicePower(int channel, float power) {
     gPresetMaxPower[channel] = power;
 }
@@ -112,7 +115,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float curSamplePulse, 
     float maxPulse = pulseI > curSamplePulse ? pulseI : curSamplePulse;
     if (deltaActivePower < minActivePower || deltaActivePower > maxActivePower || pulseI < pulseIThresh
             || (fft[1] + fft[2] + fft[3] + fft[4]) / (fft[0] + 0.0001f) < 1 || fft[1] * 1.05f > fft[0]
-            || (startupTime >= 5 && maxPulse < 2.5f) || deltaReactivePower < minReactivePower) {
+            || (startupTime >= 5 && maxPulse < 3.0f) || deltaReactivePower < minReactivePower) {
 #if OUTLOG_ON
         if (outprintf != NULL) {
             outprintf("da=%.0f pi=%.1f csp=%.1f str=%d rp=%.0f fr=%.2f f1=%.2f f3=%.2f\n", deltaActivePower,
@@ -143,7 +146,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float curSamplePulse, 
     if (wf->flatNum < minFlat || wf->extremeNum < minExtreme || wf->extremeNum > maxExtreme) {
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("fn=%d en=%d", wf->flatNum, wf->extremeNum);
+            outprintf("fn=%d en=%d\r\n", wf->flatNum, wf->extremeNum);
         }
 #endif
         return 0;
@@ -153,7 +156,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float curSamplePulse, 
     if (wf->maxDelta >= wf->maxValue * maxDeltaRatio) {
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("mad=%.2f mav=%.2f", wf->maxDelta, wf->maxValue);
+            outprintf("mad=%.2f mav=%.2f\r\n", wf->maxDelta, wf->maxValue);
         }
 #endif
         return 0;
@@ -168,10 +171,7 @@ int chargingDetect(int channel, float *fft, float pulseI, float curSamplePulse, 
         break;
     case CHARGING_ALARM_SENSITIVITY_MEDIUM: //中灵敏度
     case CHARGING_ALARM_SENSITIVITY_LOW: //低灵敏度
-        unmatchCounter = (wf->maxLeftNum >= wf->maxRightNum) + (wf->minLeftNum >= wf->minRightNum)
-                + (wf->maxLeftPointNum >= wf->maxRightPointNum)
-                + (wf->minLeftPointNum >= wf->minRightPointNum);
-
+        unmatchCounter = (wf->maxLeftNum > wf->maxRightNum) + (wf->minLeftNum > wf->minRightNum);
         if (unmatchCounter >= 2 || wf->maxLeftPointNum >= wf->maxRightPointNum
                 || wf->minLeftPointNum >= wf->minRightPointNum) {
             checkPass = 0;

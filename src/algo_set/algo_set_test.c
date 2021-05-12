@@ -45,8 +45,7 @@ static char gDirs[][100] = {
 //        "F:\\data\\devices\\fridge\\FalseAlarm"
 //        "F:\\data\\devices\\fridge\\bug11681"
 //        "F:\\data\\devices\\fridge"
-//        "F:\\data\\devices\\humidifier\\g1"
-//        "F:\\data\\devices\\charging\\true"
+//        "F:\\data\\devices\\humidifier\\0511"
 
 //        "F:\\Tmp\\bug\\20210423\\fridge\\g3"
 //        "F:\\Tmp\\bug\\20210423\\aux_350w\\True"
@@ -58,11 +57,11 @@ static char gDirs[][100] = {
 //        "F:\\Tmp\\bug\\20210506"//充电误报
 //        "F:\\data\\devices\\hairdrier\\miss"
 //        "F:\\data\\devices\\warmer\\miss"
-        "F:\\data\\devices\\waterFountain"
+//        "F:\\data\\devices\\waterFountain"
 
 //          "F:\\data\\devices\\charging\\true"
 //        "F:\\data\\devices\\charging\\true\\first_batt_then_charger0"
-//        "F:\\data\\devices\\charging\\true\\first_charger_then_batt"
+        "F:\\data\\devices\\charging\\true\\first_charger_then_batt"
 //        "F:\\data\\devices\\washer\\t2"
 //        "F:\\data\\devices\\fridge\\FalseAlarm_to_Charging"
 //        "F:\\Tmp\\bug\\20210427\\FalseAlarm_DC_To_Arcfault_bug11647"
@@ -78,12 +77,12 @@ static int init() {
     }
 
     setChargingAlarmSensitivity(0, CHARGING_ALARM_SENSITIVITY_MEDIUM);
-    setMinEventDeltaPower(0, 30);
-    setMinChargingDevicePower(0, 30);
+    setMinEventDeltaPower(0, 20);
+    setMinChargingDevicePower(0, 20);
 //    setModuleEnable(ALGO_NILM_CLOUD_FEATURE, 1);
 //    setModuleEnable(ALGO_DORM_CONVERTER_DETECT, 1);
-//    setModuleEnable(ALGO_CHARGING_DETECT, 1);
-    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
+    setModuleEnable(ALGO_CHARGING_DETECT, 1);
+//    setModuleEnable(ALGO_MALICIOUS_LOAD_DETECT, 1);
 //    setModuleEnable(ALGO_ARCFAULT_DETECT, 1);
 //    setArcfaultSensitivity(0, ARCFAULT_SENSITIVITY_HIGH);
 //    setDormConverterAlarmSensitivity(0, DORM_CONVERTER_SENSITIVITY_HIGH);

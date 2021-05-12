@@ -23,7 +23,7 @@
 #endif
 
 /**固定定义区*/
-const static char VERSION[] = { 1, 0, 0, 6 };
+const static char VERSION[] = { 1, 0, 0, 7 };
 static const int B_MAX[3] = { 2021, 12, 30 }; //最大允许集成编译时间,其他地方是障眼法
 
 /**运行变量区*/
@@ -603,7 +603,7 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 //    }
 //#endif
 //#endif
-            //负荷投切事件
+    //负荷投切事件
     int switchEventHappen = 0;
     float absDeltaStandardPower = fabs(
             getStandardPower(activePower, effU)
@@ -617,8 +617,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     if (isStable != gLastStable[channel] && absDeltaStandardPower > gMinEventDeltaPower[channel] / 2) {
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("gt=%d st=%d ap=%.1f rp=%.1f se=%d\r\n", gTimer[channel], isStable, activePower,
-                    getReactivePower(activePower, effI * effU), switchEventHappen);
+            outprintf("[%d]gt=%d st=%d ap=%.1f rp=%.1f se=%d\r\n", channel, gTimer[channel], isStable,
+                    activePower, getReactivePower(activePower, effI * effU), switchEventHappen);
         }
 #endif
     }
@@ -655,14 +655,20 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
     int startupTime = 0; // 启动时间
     int zeroCrossLast = -1, zeroCrossThis = -1; //上个周期及本个周期稳态电压穿越
 
-    static float voltageAberrRate = 0;
-    if (gFuncMaliciousLoadEnabled && gTimer[0] % 90000 == 10) { //每半小时更新一次电压畸变率，节省性能
-        voltageAberrRate = getAberrationRate(vol, 0);
-        if (voltageAberrRate > 9)
-            voltageAberrRate = 9;
+    static float voltageAberrRate[CHANNEL_NUM] = { 0 };
+    //每半小时更新一次电压畸变率，节省性能. 如果持续为0，则每秒更新1次
+    if (gFuncMaliciousLoadEnabled
+            && (gTimer[channel] % 90000 == 10
+                    || (voltageAberrRate[channel] < LF && gTimer[channel] % 50 == 10))) {
+        voltageAberrRate[channel] = getAberrationRate(vol, 0);
+        if (voltageAberrRate[channel] > 9)
+            voltageAberrRate[channel] = 9;
 #if OUTLOG_ON
         if (outprintf != NULL) {
-            outprintf("var=%.1f\r\n", voltageAberrRate);
+            outprintf("[%d]var=%.1f\r\n", channel, voltageAberrRate[channel]);
+            if (voltageAberrRate[channel] < 0.1f) {
+                outprintf("[%d]vol:%.1f %.1f %.1f %.1f\r\n", channel, vol[0], vol[1], vol[2], vol[3]);
+            }
         }
 #endif
     }
@@ -765,8 +771,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 
     //充电检测
     if (gFuncChargingAlarmEnabled && switchEventHappen) {
-        gChargingAlarm[channel] = chargingDetect(channel, deltaOddFft, iPulse, curSamplePulse, deltaActivePower,
-                deltaReactivePower, startupTime, &deltaWf, NULL);
+        gChargingAlarm[channel] = chargingDetect(channel, deltaOddFft, iPulse, curSamplePulse,
+                deltaActivePower, deltaReactivePower, startupTime, &deltaWf, NULL);
         if (gChargingAlarm[channel]) {
 #if OUTLOG_ON
             if (outprintf != NULL) {
@@ -781,8 +787,8 @@ int feedData(int channel, float *cur, float *vol, int unixTimestamp, char *extra
 
         char msg[50] = { 0 };
         gMaliLoadAlarm[channel] = maliciousLoadDetect(channel, deltaOddFft, iPulse, curSamplePulse,
-                deltaActivePower, deltaReactivePower, effU, activePower, reactivePower, voltageAberrRate,
-                &deltaWf, &ds, msg);
+                deltaActivePower, deltaReactivePower, effU, activePower, reactivePower,
+                voltageAberrRate[channel], &deltaWf, &ds, msg);
 #if TUOQIANG_DEBUG
 #if OUTLOG_ON
         if (outprintf != NULL) {
